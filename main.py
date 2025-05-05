@@ -16,12 +16,15 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(CREDENTIALS, scope)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SHEET_ID).worksheet("Interface")  # Feuille 'Interface'
 
+print("✅ Connexion Google Sheets réussie.")
+
 # Lecture des données
 rows = sheet.get_all_values()[1:]  # ignore l'en-tête
+print(f"📋 {len(rows)} lignes trouvées dans la feuille 'Interface'.")
 
 messages = []
 
-for row in rows:
+for i, row in enumerate(rows):
     try:
         nom = row[0]
         adresse = row[2]
@@ -29,16 +32,20 @@ for row in rows:
         proprio = row[6]
         rappel = row[7].strip().lower()
 
+        print(f"🔎 Ligne {i+2}: {nom} | {adresse} | {loyer} | {proprio} | Rappel={rappel}")
+
         if rappel in ["x", "✓", "true", "oui"]:
             messages.append(f"🔔 {nom} – {adresse} – {loyer} EUR – Propriétaire : {proprio}")
     except IndexError:
-        continue
+        print(f"⚠️ Ligne {i+2} ignorée (IndexError)")
 
 # Envoi du message Telegram
 if messages:
     message = "📅 Locataires à relancer :\n" + "\n".join(messages)
 else:
     message = "✅ Aucun rappel de loyer à envoyer aujourd’hui."
+
+print("📨 Message à envoyer via Telegram :\n" + message)
 
 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 payload = {
@@ -47,4 +54,4 @@ payload = {
 }
 
 response = requests.post(url, data=payload)
-print("Message envoyé:", response.status_code, response.text)
+print("📤 Statut de l'envoi Telegram :", response.status_code, response.text)
