@@ -4,7 +4,7 @@ import requests
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-print("🧪 Début du script ultra-verbeux")
+print("🧪 Démarrage du script ultra-sécurisé")
 
 # === Chargement des variables d'environnement ===
 try:
@@ -14,15 +14,17 @@ try:
     raw_json = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
 
     print("🔍 Variables récupérées :")
-    print(f"  - TELEGRAM_TOKEN présent : {'Oui' if BOT_TOKEN else 'Non'}")
+    print(f"  - TELEGRAM_TOKEN présent : {'✅' if BOT_TOKEN else '❌'}")
     print(f"  - TELEGRAM_CHAT_ID : {CHAT_ID}")
     print(f"  - GOOGLE_SHEET_ID : {SHEET_ID}")
     print(f"  - JSON (début brut) : {raw_json[:40]}...")
 
     CREDENTIALS = json.loads(raw_json)
     print("✅ JSON chargé avec succès.")
+    print("🔑 Type :", CREDENTIALS.get("type"))
+    print("📧 Email du bot :", CREDENTIALS.get("client_email"))
 except Exception as e:
-    print("❌ ERREUR au chargement des variables :", e)
+    print("❌ ERREUR chargement JSON ou variables :", e)
     raise
 
 # === Connexion Google Sheets ===
@@ -32,21 +34,32 @@ try:
     client = gspread.authorize(creds)
     print("✅ Connexion Google Sheets réussie.")
 except Exception as e:
-    print("❌ ERREUR Connexion Google Sheets :", e)
+    print("❌ ERREUR connexion Sheets :", e)
     raise
 
-# === Ouverture de la feuille 'Interface' ===
+# === Liste des onglets disponibles ===
 try:
-    sheet = client.open_by_key(SHEET_ID).worksheet("Interface")
-    print("✅ Feuille 'Interface' ouverte.")
+    spreadsheet = client.open_by_key(SHEET_ID)
+    sheet_titles = [sh.title for sh in spreadsheet.worksheets()]
+    print(f"📄 Feuilles disponibles dans le Google Sheet : {sheet_titles}")
 except Exception as e:
-    print("❌ ERREUR ouverture de l’onglet 'Interface' :", e)
+    print("❌ ERREUR ouverture Google Sheet :", e)
+    raise
+
+# === Sélection de la feuille 'Interface' ===
+try:
+    if "Interface" not in sheet_titles:
+        raise ValueError("❌ L’onglet 'Interface' n’existe pas dans le fichier Google Sheet.")
+    sheet = spreadsheet.worksheet("Interface")
+    print("✅ Onglet 'Interface' chargé avec succès.")
+except Exception as e:
+    print("❌ ERREUR chargement de la feuille 'Interface' :", e)
     raise
 
 # === Lecture des lignes ===
 try:
-    rows = sheet.get_all_values()[1:]
-    print(f"📋 {len(rows)} lignes lues dans la feuille.")
+    rows = sheet.get_all_values()[1:]  # ignore l’en-tête
+    print(f"📋 {len(rows)} lignes lues dans 'Interface'.")
 except Exception as e:
     print("❌ ERREUR lecture des lignes :", e)
     raise
@@ -61,7 +74,7 @@ for i, row in enumerate(rows):
         proprio = row[6] if len(row) > 6 else ""
         rappel = row[7].strip().lower() if len(row) > 7 else ""
 
-        print(f"🔎 Ligne {i+2} : {nom} | {adresse} | {loyer} | {proprio} | Rappel={rappel}")
+        print(f"🔎 Ligne {i+2} : {nom} | {adresse} | {loyer} | {proprio} | Rappel={repr(rappel)}")
 
         if rappel in ["x", "✓", "true", "oui"]:
             msg = f"🔔 {nom} – {adresse} – {loyer} EUR – Propriétaire : {proprio}"
