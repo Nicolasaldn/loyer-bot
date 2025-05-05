@@ -4,38 +4,38 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
-print("🔁 Démarrage du bot...")
+print("🧪 Début du script de test")
 
-# === Lecture des variables d'environnement ===
+# === Lecture et test des variables d'environnement ===
 try:
     BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
     CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
     SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
-    CREDENTIALS = json.loads(os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON"))
-
-    assert BOT_TOKEN and CHAT_ID and SHEET_ID and CREDENTIALS
-    print("✅ Variables d'environnement OK.")
+    raw_credentials = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
+    
+    print("🔍 Contenu brut détecté (début) :", raw_credentials[:60].replace("\n", "\\n") + "...")
+    CREDENTIALS = json.loads(raw_credentials)
+    print("✅ JSON chargé avec succès.")
+    print("🔑 Type :", CREDENTIALS.get("type"))
+    print("📧 Email du bot :", CREDENTIALS.get("client_email"))
 except Exception as e:
-    print("❌ Erreur dans les variables d'environnement :", e)
+    print("❌ Erreur chargement JSON ou variables :", e)
     raise
 
-# === Connexion à Google Sheets ===
+# === Connexion Google Sheets ===
 try:
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(CREDENTIALS, scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet("Interface")
     print("✅ Connexion Google Sheets réussie.")
-except Exception as e:
-    print("❌ Erreur Google Sheets :", e)
-    raise
 
-# === Lecture des données ===
-try:
-    rows = sheet.get_all_values()[1:]  # ignore l'en-tête
-    print(f"📋 {len(rows)} lignes lues dans 'Interface'.")
+    sheet = client.open_by_key(SHEET_ID).worksheet("Interface")
+    print("✅ Feuille 'Interface' ouverte avec succès.")
+
+    rows = sheet.get_all_values()[1:]
+    print(f"📄 {len(rows)} lignes trouvées dans la feuille.")
 except Exception as e:
-    print("❌ Erreur lecture lignes :", e)
+    print("❌ ERREUR Google Sheets :", str(e))
     raise
 
 # === Analyse des lignes ===
@@ -54,7 +54,7 @@ for i, row in enumerate(rows):
         if rappel in ["x", "✓", "true", "oui"]:
             msg = f"🔔 {nom} – {adresse} – {loyer} EUR – Propriétaire : {proprio}"
             messages.append(msg)
-            print("✅ Ajouté :", msg)
+            print(f"✅ Ajouté :", msg)
         else:
             print("⏭️ Ignoré (rappel non valide)")
     except Exception as e:
@@ -67,7 +67,7 @@ try:
     else:
         message = "✅ Aucun rappel de loyer à envoyer aujourd’hui."
 
-    print("📨 Message à envoyer :\n" + message)
+    print("📨 Message à envoyer via Telegram :\n" + message)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
