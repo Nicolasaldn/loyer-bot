@@ -4,6 +4,23 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
+print("🔁 Démarrage du bot...")
+
+# Connexion Google Sheets
+try:
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(CREDENTIALS, scope)
+    client = gspread.authorize(creds)
+    print("✅ Connexion Google Sheets réussie.")
+
+    sheet = client.open_by_key(SHEET_ID).worksheet("Interface")
+    print("✅ Feuille 'Interface' ouverte avec succès.")
+
+    rows = sheet.get_all_values()[1:]
+    print(f"📄 {len(rows)} lignes trouvées dans la feuille.")
+except Exception as e:
+    print("❌ ERREUR Google Sheets :", str(e))
+
 # Lecture des variables d'environnement
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
