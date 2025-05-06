@@ -116,65 +116,58 @@ spreadsheet = client.open(SHEET_NAME)
 sheet_interface = spreadsheet.worksheet("Interface")
 sheet_db = spreadsheet.worksheet("DB")
 
-# === Boucle du bot Telegram ===
-last_update_id = None
+# === Traitement unique d'un seul message entrant ===
+updates = requests.get(f"{BASE_URL}/getUpdates").json()
+messages = updates.get("result", [])
 
-while True:
-    updates = requests.get(f"{BASE_URL}/getUpdates").json()
-    messages = updates.get("result", [])
-    if messages:
-        last_msg = messages[-1]
-        msg_id = last_msg["update_id"]
-        if msg_id != last_update_id:
-            last_update_id = msg_id
-            text = last_msg["message"].get("text", "")
-            command = process_message(text)
+if messages:
+    last_msg = messages[-1]
+    text = last_msg["message"].get("text", "")
+    command = process_message(text)
 
-            if "error" in command:
-                send_message("⛔ " + command["error"])
+    if "error" in command:
+        send_message("⛔ " + command["error"])
 
-            elif command["type"] == "all":
-                send_message(f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')} en cours…")
-                data = sheet_interface.get_all_values()[5:]  # skip headers
-                db_data = sheet_db.get_all_values()[1:]  # skip headers
-                db_dict = {row[0]: row[1] for row in db_data}
-                for row in data:
-                    if len(row) >= 7 and row[6].strip().lower() == 'true':
-                        locataire = {
-                            "nom": row[0].strip().title(),
-                            "adresse": row[2].strip(),
-                            "loyer": float(row[3]),
-                        }
-                        proprio = row[5].strip()
-                        proprio_adresse = db_dict.get(proprio, "")
-                        frequence = row[4].strip()
-                        pdf = AvisLoyerPDF()
-                        pdf.add_page()
-                        pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
-                        filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
-                        pdf.output(filename)
-                        send_document(filename)
+    elif command["type"] == "all":
+        send_message(f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')} en cours…")
+        data = sheet_interface.get_all_values()[5:]  # skip headers
+        db_data = sheet_db.get_all_values()[1:]  # skip headers
+        db_dict = {row[0]: row[1] for row in db_data}
+        for row in data:
+            if len(row) >= 7 and row[6].strip().lower() == 'true':
+                locataire = {
+                    "nom": row[0].strip().title(),
+                    "adresse": row[2].strip(),
+                    "loyer": float(row[3]),
+                }
+                proprio = row[5].strip()
+                proprio_adresse = db_dict.get(proprio, "")
+                frequence = row[4].strip()
+                pdf = AvisLoyerPDF()
+                pdf.add_page()
+                pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
+                filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
+                pdf.output(filename)
+                send_document(filename)
 
-            elif command["type"] == "single":
-                send_message(f"📄 Génération du rappel pour {command['nom']} en cours…")
-                data = sheet_interface.get_all_values()[5:]  # skip headers
-                db_data = sheet_db.get_all_values()[1:]
-                db_dict = {row[0]: row[1] for row in db_data}
-                for row in data:
-                    if row[0].strip().lower() == command['nom'].lower() and row[6].strip().lower() == 'true':
-                        locataire = {
-                            "nom": row[0].strip().title(),
-                            "adresse": row[2].strip(),
-                            "loyer": float(row[3]),
-                        }
-                        proprio = row[5].strip()
-                        proprio_adresse = db_dict.get(proprio, "")
-                        frequence = row[4].strip()
-                        pdf = AvisLoyerPDF()
-                        pdf.add_page()
-                        pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
-                        filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
-                        pdf.output(filename)
-                        send_document(filename)
-                        break
-    time.sleep(2)
+    elif command["type"] == "single":
+        send_message(f"📄 Génération du rappel pour {command['nom']} en cours…")
+        data = sheet_interface.get_all_values()[5:]  # skip headers
+        db_data = sheet_db.get_all_values()[1:]
+        db_dict = {row[0]: row[1] for row in db_data}
+        for row in data:
+            if row[0].strip().lower() == command['nom'].lower() and row[6].strip().lower() == 'true':
+                locataire = {
+                    "nom": row[0].strip().title(),
+                    "adresse": row[2].strip(),
+                    "loyer": float(row[3]),
+                }
+                proprio = row[5].strip()
+                proprio_adresse = db_dict.get(proprio, "")
+                frequence = row[4].strip()
+                pdf = AvisLoyerPDF()
+                pdf.add_page()
+                pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
+                filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
+                pdf.output(filename)
+                send_document(filename)
