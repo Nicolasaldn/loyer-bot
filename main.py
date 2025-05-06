@@ -1,17 +1,26 @@
 import os
+import sys
 from fastapi import FastAPI, Request
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
 from handlers.rappels import handle_message
 import uvicorn
 
-BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+# === Pour s'assurer que tous les dossiers (utils, pdf, handlers) sont bien importables ===
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# === Variables d’environnement ===
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # ex: https://monbot.onrender.com
+
+# === FastAPI app ===
 app = FastAPI()
+
+# === Telegram app ===
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+# === Webhook setup ===
 @app.on_event("startup")
 async def startup():
     await telegram_app.initialize()
@@ -24,6 +33,6 @@ async def webhook(request: Request):
     await telegram_app.process_update(update)
     return {"status": "ok"}
 
+# === Lancement local ===
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
