@@ -7,22 +7,32 @@ import os
 
 async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
     chat_id = update.message.chat_id
-    data = get_sheet_data("Interface")[5:]
+    data = get_sheet_data()[5:]  # ✅ corrigé : on ne passe plus "Interface" en argument
     db_dict = get_db_dict()
 
     if command["type"] == "all":
-        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}..."
+        )
         for row in data:
             if len(row) >= 8 and row[7].strip().lower() == 'true':
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
 
     elif command["type"] == "single":
-        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"📄 Génération du rappel pour {command['nom']}..."
+        )
         for row in data:
             if row[1].strip().lower() == command['nom'].lower() and row[7].strip().lower() == 'true':
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
                 return
-        await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable ou non à relancer.")
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Locataire introuvable ou non à relancer."
+        )
 
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
@@ -38,8 +48,13 @@ async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     pdf = AvisLoyerPDF()
     pdf.add_page()
     pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
+
     filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
     pdf.output(filename)
 
     with open(filename, "rb") as f:
-        await context.bot.send_document(chat_id=chat_id, document=InputFile(f), filename=os.path.basename(filename))
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=InputFile(f),
+            filename=os.path.basename(filename)
+        )
