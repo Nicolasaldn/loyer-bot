@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
     chat_id = update.message.chat_id
-    data = get_sheet_data()[5:]
+    data = get_sheet_data()  # ✅ on ne saute plus de lignes
     db_dict = get_db_dict()
 
     logger.info(f"[DEBUG] Commande reçue : {command}")
