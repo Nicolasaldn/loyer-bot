@@ -1,47 +1,45 @@
-import os
-from fastapi import FastAPI, Request
+import logging
 from telegram import Update
-from telegram.ext import Application, MessageHandler, ContextTypes, filters
-
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from handlers.rappels import handle_rappel
 from handlers.quittances import handle_quittance
 from handlers.utils import parse_command
-from dotenv import load_dotenv
 
-load_dotenv()
+# Configure the logging module to output debug information
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+# Token for your Telegram bot
+TOKEN = "YOUR_BOT_TOKEN"
 
-bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+# Initialize the bot
+bot_app = Application.builder().token(TOKEN).build()
 
-app = FastAPI()
+async def route_message(update: Update, context: CallbackContext):
+    """Handle incoming messages and route based on command."""
+    text = update.message.text.strip()  # Get the text of the message
+    source, arguments = parse_command(text)  # Parse the command
 
-# 🎯 Handler principal : route tous les messages texte
-async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    command = parse_command(update.message.text)
-    if command["source"] == "rappel":
-        await handle_rappel(update, context, command)
-    elif command["source"] == "quittance":
-        await handle_quittance(update, context, command)
+    # Route based on the command source
+    if source == "rappel":
+        await handle_rappel(arguments, context)  # Handle the "rappel" command
+    elif source == "quittance":
+        await handle_quittance(arguments, context)  # Handle the "quittance" command
     else:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Commande non reconnue."
-        )
+        await context.bot.send_message(chat_id=update.message.chat_id, text="Commande non reconnue.")  # Unknown command
 
-# 🔁 Enregistrement du handler
-bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_message))
+# Command handlers
+async def start(update: Update, context: CallbackContext):
+    """Send a welcome message when the user starts the bot."""
+    await update.message.reply_text("Bonjour! Envoyez une commande pour commencer.")
 
-# 🔗 Webhook FastAPI
-@app.on_event("startup")
-async def startup():
-    await bot_app.initialize()
-    await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+def main():
+    """Start the bot and set up the webhook."""
+    bot_app.add_handler(CommandHandler("start", start))  # Add /start command handler
+    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_message))  # Route all text messages to route_message
 
-@app.post("/webhook")
-async def webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, bot_app.bot)
-    await bot_app.process_update(update)
-    return "ok"
+    # Start the bot with webhook
+    bot_app.run_polling()
+
+if __name__ == "__main__":
+    main()
