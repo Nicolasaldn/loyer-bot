@@ -18,7 +18,7 @@ class RappelPDF(FPDF):
 
     def header(self):
         self.set_font("DejaVu", "B", 14)
-        self.cell(0, 10, "AVIS D'ÉCHÉANCE", ln=True, align="C")
+        self.cell(0, 8, "AVIS D'ÉCHÉANCE", ln=True, align="C")
         self.ln(2)
 
     def footer(self):
@@ -52,69 +52,69 @@ def generate_rappel_pdf(nom_locataire: str, date_str: str, output_dir="pdf/gener
     pdf = RappelPDF()
     pdf.add_page()
 
-    # --- Bloc coordonnées : bailleur gauche, locataire droite
-    start_y = pdf.get_y()
-
-    pdf.set_font("DejaVu", "", 10)
-    pdf.set_xy(20, start_y)
-    pdf.multi_cell(70, 5, f"{infos['bailleur_nom']}\n{infos['bailleur_adresse']}")
-
-    pdf.set_xy(120, start_y)
-    pdf.multi_cell(70, 5, f"{infos['locataire_nom']}\n{infos['locataire_adresse']}")
-    pdf.ln(20)
-
-    # --- Sous-titre centré : période
+    # Ligne période sous le titre
     pdf.set_font("DejaVu", "", 11)
     periode_txt = f"Avis d’échéance de loyer pour la période du {periode_debut.strftime('%d/%m/%Y')} au {periode_fin.strftime('%d/%m/%Y')}"
-    pdf.multi_cell(0, 8, periode_txt, align="C")
-    pdf.ln(5)
+    pdf.cell(0, 8, periode_txt, ln=True, align="C")
+    pdf.ln(8)
 
-    # --- Fait à Paris
+    # Bloc coordonnées (bailleur à gauche)
     pdf.set_font("DejaVu", "", 10)
-    pdf.set_x(0)
-    pdf.cell(0, 8, f"Fait à Paris, le {date_du_jour}", align="C", ln=True)
+    y_start = pdf.get_y()
+    pdf.set_xy(15, y_start)
+    pdf.multi_cell(80, 5, f"{infos['bailleur_nom']}\n{infos['bailleur_adresse']}")
+    pdf.set_y(y_start)
+
+    # Locataire à droite (collé bord droit)
+    locataire_lines = f"{infos['locataire_nom']}\n{infos['locataire_adresse']}".split("\n")
+    for line in locataire_lines:
+        line_width = pdf.get_string_width(line)
+        pdf.set_x(210 - 15 - line_width)
+        pdf.cell(line_width, 5, line, ln=True)
+    pdf.ln(8)
+
+    # Fait à Paris
+    pdf.set_x(15)
+    pdf.cell(0, 6, f"Fait à Paris, le {date_du_jour}", ln=True)
     pdf.ln(10)
 
-    # --- Adresse du bien
-    pdf.set_font("DejaVu", "B", 10)
-    pdf.cell(0, 7, "ADRESSE DE LA LOCATION :", ln=True)
+    # Adresse location
+    pdf.set_font("DejaVu", "B", 11)
+    pdf.cell(0, 6, "ADRESSE DE LA LOCATION :", ln=True)
     pdf.set_font("DejaVu", "", 10)
-    pdf.multi_cell(0, 6, infos["locataire_adresse"])
+    pdf.cell(0, 6, infos["locataire_adresse"], ln=True)
     pdf.ln(10)
 
-    # --- Tableau
-    col1_width = 100
-    col2_width = 80
+    # Tableau
     pdf.set_font("DejaVu", "B", 10)
     pdf.set_fill_color(230, 230, 230)
-    pdf.cell(col1_width, 10, "LIBELLÉ", border=1, fill=True)
-    pdf.cell(col2_width, 10, "MONTANT", border=1, ln=True, fill=True)
+    pdf.cell(120, 8, "LIBELLÉ", border=1, fill=True)
+    pdf.cell(0, 8, "MONTANT", border=1, ln=True, fill=True)
 
     pdf.set_font("DejaVu", "", 10)
-    pdf.cell(col1_width, 10, "Loyer TTC", border=1)
-    pdf.cell(col2_width, 10, f"{infos['loyer_ttc']:.2f} €".rjust(15), border=1, ln=True)
+    pdf.cell(120, 8, "Loyer TTC", border=1)
+    pdf.cell(0, 8, f"{infos['loyer_ttc']:.2f} €", border=1, ln=True, align="R")
 
     pdf.set_font("DejaVu", "B", 10)
-    pdf.cell(col1_width, 10, "TOTAL", border=1)
-    pdf.cell(col2_width, 10, f"{infos['loyer_ttc']:.2f} €".rjust(15), border=1, ln=True)
+    pdf.cell(120, 8, "TOTAL", border=1)
+    pdf.cell(0, 8, f"{infos['loyer_ttc']:.2f} €", border=1, ln=True, align="R")
     pdf.ln(10)
 
-    # --- Paiement exigible
+    # Paiement exigible
     pdf.set_font("DejaVu", "", 10)
-    pdf.cell(0, 10, f"PAIEMENT EXIGIBLE LE : {paiement_exigible}", ln=True)
+    pdf.cell(0, 8, f"PAIEMENT EXIGIBLE LE : {paiement_exigible}", ln=True)
     pdf.ln(6)
 
-    # --- Texte final
+    # Texte bas de page
     pdf.set_font("DejaVu", "", 9.5)
     pdf.multi_cell(0, 6,
         "Le règlement est à effectuer par virement bancaire selon les modalités prévues dans le bail.\n"
         "En cas de difficulté, merci de me contacter dans les plus brefs délais."
     )
 
-    # --- Export
+    # Sauvegarde
     os.makedirs(output_dir, exist_ok=True)
     filename = f"Avis_{nom_locataire.replace(' ', '_')}_{date.strftime('%Y-%m-%d')}.pdf"
     filepath = os.path.join(output_dir, filename)
     pdf.output(filepath)
-
     return filepath
