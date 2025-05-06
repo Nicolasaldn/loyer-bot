@@ -16,14 +16,18 @@ from handlers.utils import parse_command
 logging.basicConfig(level=logging.INFO)
 
 # Vérifie le token
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN or ":" not in BOT_TOKEN:
-    raise ValueError("BOT_TOKEN est mal configuré. Vérifie Render.")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+if not TELEGRAM_TOKEN or ":" not in TELEGRAM_TOKEN:
+    raise ValueError("TELEGRAM_TOKEN est mal configuré. Vérifie Render.")
 
-# Création des instances FastAPI et Telegram
-bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
+# Création de l'application Telegram
+bot_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+# Ajout du message handler
+bot_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), lambda u, c: route_message(u, c)))
+
+# Création de l'application FastAPI
 app = FastAPI()
-
 
 # Handler Telegram
 async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,13 +45,11 @@ async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_quittance(update, context, command)
         else:
             await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Commande invalide.")
-
     except Exception as e:
         logging.exception("Erreur dans le handler Telegram")
         await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Erreur lors du traitement.")
 
-
-# Lien entre FastAPI et Telegram
+# Endpoint webhook
 @app.post("/webhook")
 async def webhook(req: Request):
     data = await req.json()
@@ -56,12 +58,7 @@ async def webhook(req: Request):
     await bot_app.process_update(update)
     return {"status": "ok"}
 
-
-# Pour vérifier que le service répond (GET /)
+# Endpoint test GET
 @app.get("/")
 def read_root():
     return {"message": "Bot is running ✅"}
-
-
-# Enregistre le message handler sur Telegram
-bot_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), route_message))
