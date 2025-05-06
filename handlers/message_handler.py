@@ -2,12 +2,14 @@ from telegram import Update
 from telegram.ext import CallbackContext
 from utils.sheets import list_tenants
 from utils.state import set_user_state, get_user_state, clear_user_state
+from utils.parser import extract_name_and_date
+from pdf.generate_rappel import generate_rappel_pdf
 
 def handle_message(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     message_text = update.message.text.lower()
 
-    # --- Cas 1 : l'utilisateur parle de "rappel"
+    # --- Cas 1 : intention de rappel détectée
     if "rappel" in message_text:
         set_user_state(user_id, {"action": "rappel"})
         context.bot.send_message(
@@ -16,18 +18,24 @@ def handle_message(update: Update, context: CallbackContext):
         )
         return
 
-    # --- Cas 2 : l'utilisateur a une action en cours (rappel)
+    # --- Cas 2 : contexte actif (état = rappel)
     state = get_user_state(user_id)
     if state.get("action") == "rappel":
-        tenants = [t.lower() for t in list_tenants()]
-        found = next((t for t in tenants if t in message_text), None)
+        name, date_str = extract_name_and_date(message_text)
 
-        if found:
+        if name:
             clear_user_state(user_id)
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Ok, je vais générer un rappel pour {found.title()} 📬 (PDF à venir)"
-            )
+            if date_str:
+                filepath = generate_rappel_pdf(name, date_str)
+                context.bot.send_document(
+                    chat_id=update.effective_chat.id,
+                    document=open(filepath, "rb")
+                )
+            else:
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f"Ok, je vais générer un rappel pour {name} 📬 (mais je n’ai pas reconnu de date)"
+                )
         else:
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
