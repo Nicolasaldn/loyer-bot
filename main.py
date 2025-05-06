@@ -12,6 +12,7 @@ from fpdf import FPDF
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 SHEET_NAME = "RE - Gestion"
+raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # === Fonction d'envoi Telegram ===
@@ -106,6 +107,15 @@ class AvisLoyerPDF(FPDF):
         self.multi_cell(0, 6, "Cet avis est une demande de paiement. Il ne peut en aucun cas servir de reçu ou de quittance de loyer.")
         return self
 
+# === Connexion Google Sheets ===
+creds_dict = json.loads(raw_creds)
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+spreadsheet = client.open(SHEET_NAME)
+sheet_interface = spreadsheet.worksheet("Interface")
+sheet_db = spreadsheet.worksheet("DB")
+
 # === Boucle du bot Telegram ===
 last_update_id = None
 
@@ -122,11 +132,49 @@ while True:
 
             if "error" in command:
                 send_message("⛔ " + command["error"])
+
             elif command["type"] == "all":
                 send_message(f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')} en cours…")
-                # TODO : ajouter la lecture Google Sheets + génération tous les PDF
+                data = sheet_interface.get_all_values()[5:]  # skip headers
+                db_data = sheet_db.get_all_values()[1:]  # skip headers
+                db_dict = {row[0]: row[1] for row in db_data}
+                for row in data:
+                    if len(row) >= 7 and row[6].strip().lower() == 'true':
+                        locataire = {
+                            "nom": row[0].strip().title(),
+                            "adresse": row[2].strip(),
+                            "loyer": float(row[3]),
+                        }
+                        proprio = row[5].strip()
+                        proprio_adresse = db_dict.get(proprio, "")
+                        frequence = row[4].strip()
+                        pdf = AvisLoyerPDF()
+                        pdf.add_page()
+                        pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
+                        filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
+                        pdf.output(filename)
+                        send_document(filename)
+
             elif command["type"] == "single":
                 send_message(f"📄 Génération du rappel pour {command['nom']} en cours…")
-                # TODO : ajouter lecture + PDF ciblé
-
+                data = sheet_interface.get_all_values()[5:]  # skip headers
+                db_data = sheet_db.get_all_values()[1:]
+                db_dict = {row[0]: row[1] for row in db_data}
+                for row in data:
+                    if row[0].strip().lower() == command['nom'].lower() and row[6].strip().lower() == 'true':
+                        locataire = {
+                            "nom": row[0].strip().title(),
+                            "adresse": row[2].strip(),
+                            "loyer": float(row[3]),
+                        }
+                        proprio = row[5].strip()
+                        proprio_adresse = db_dict.get(proprio, "")
+                        frequence = row[4].strip()
+                        pdf = AvisLoyerPDF()
+                        pdf.add_page()
+                        pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
+                        filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
+                        pdf.output(filename)
+                        send_document(filename)
+                        break
     time.sleep(2)
