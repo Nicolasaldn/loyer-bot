@@ -1,37 +1,67 @@
 import os
+import logging
 from fastapi import FastAPI, Request
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 from handlers.rappels import handle_rappel
 from handlers.quittances import handle_quittance
 from handlers.utils import parse_command
 
-# Init FastAPI app
+# Configuration des logs
+logging.basicConfig(level=logging.INFO)
+
+# Vérifie le token
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN or ":" not in BOT_TOKEN:
+    raise ValueError("BOT_TOKEN est mal configuré. Vérifie Render.")
+
+# Création des instances FastAPI et Telegram
+bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
 app = FastAPI()
 
-# Init Telegram bot app
-bot_app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
 
+# Handler Telegram
+async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        text = update.message.text
+        command = parse_command(text)
+        if not command:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Commande non reconnue.")
+            return
+
+        source = command["source"]
+        if source == "rappel":
+            await handle_rappel(update, context, command)
+        elif source == "quittance":
+            await handle_quittance(update, context, command)
+        else:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Commande invalide.")
+
+    except Exception as e:
+        logging.exception("Erreur dans le handler Telegram")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Erreur lors du traitement.")
+
+
+# Lien entre FastAPI et Telegram
 @app.post("/webhook")
-async def webhook(request: Request):
-    body = await request.json()
-    update = Update.de_json(body, bot_app.bot)
+async def webhook(req: Request):
+    data = await req.json()
+    update = Update.de_json(data, bot_app.bot)
+    await bot_app.initialize()
     await bot_app.process_update(update)
     return {"status": "ok"}
 
-@bot_app.message_handler()
-async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
 
-    text = update.message.text
-    command = parse_command(text)
+# Pour vérifier que le service répond (GET /)
+@app.get("/")
+def read_root():
+    return {"message": "Bot is running ✅"}
 
-    if not command:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Commande non reconnue.")
-        return
 
-    if command["source"] == "rappel":
-        await handle_rappel(update, context, command)
-    elif command["source"] == "quittance":
-        await handle_quittance(update, context, command)
+# Enregistre le message handler sur Telegram
+bot_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), route_message))
