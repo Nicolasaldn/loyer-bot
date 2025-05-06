@@ -1,85 +1,53 @@
 import os
 import json
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import requests
+from oauth2client.service_account import ServiceAccountCredentials
 
-print("🧪 Démarrage du script de test")
+print("🧪 Test complet d’accès Google Sheet")
 
-# === Vérification des variables d'environnement ===
+# Récupération des variables d’environnement
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
+
+# Étape 1 : Authentification
 try:
-    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-    SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
-    raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
-
-    if not BOT_TOKEN or not CHAT_ID:
-        raise ValueError("🔴 TELEGRAM_TOKEN ou TELEGRAM_CHAT_ID manquant")
-    if not SHEET_ID or not raw_creds:
-        raise ValueError("🔴 GOOGLE_SHEET_ID ou GOOGLE_SHEET_CREDENTIALS_JSON manquant")
-
-    print("✅ Variables d'environnement présentes.")
-except Exception as e:
-    print("❌ Erreur lecture des variables d'environnement :", e)
-    exit(1)
-
-# === Test JSON Credentials ===
-try:
-    print("🔍 Début du parsing du JSON...")
-    credentials = json.loads(raw_creds)
-    print("✅ JSON chargé avec succès.")
-    print("🔑 Type :", credentials.get("type"))
-    print("📧 Email du bot :", credentials.get("client_email"))
-except Exception as e:
-    print("❌ Erreur parsing JSON :", e)
-    exit(1)
-
-# === Connexion Google Sheets ===
-try:
+    creds_dict = json.loads(raw_creds)
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials, scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    print("✅ Connexion à Google Sheets réussie.")
+    print("✅ Connexion Google API OK")
 except Exception as e:
-    print("❌ Échec de connexion à Google Sheets :", e)
+    print("❌ Authentification Google Sheets échouée :", e)
     exit(1)
 
-# === Accès à la feuille ===
+# Étape 2 : Ouverture du fichier et récupération des onglets
 try:
-    sheet = client.open_by_key(SHEET_ID).worksheet("Interface")
-    print("✅ Accès à la feuille 'Interface' réussi.")
-except Exception as e:
-    print("❌ Impossible d’accéder à la feuille 'Interface' :", e)
-    exit(1)
+    spreadsheet = client.open_by_key(SHEET_ID)
+    file_title = spreadsheet.title
+    worksheets = spreadsheet.worksheets()
+    sheet_names = [ws.title for ws in worksheets]
 
-# === Lecture des données ===
-try:
-    rows = sheet.get_all_values()
-    print(f"📄 {len(rows)-1} lignes lues (en-tête ignoré).")
+    print(f"📄 Fichier : {file_title}")
+    print("🗂️ Onglets trouvés :", sheet_names)
 
-    if len(rows) < 2:
-        print("⚠️ Feuille vide ou uniquement l'en-tête.")
+    # Message à envoyer par Telegram
+    if "Interface" in sheet_names:
+        message = f"✅ Le fichier *{file_title}* est accessible.\n✅ L’onglet `Interface` existe bien.\n\n🗂️ Autres onglets trouvés :\n" + "\n".join(f"- {name}" for name in sheet_names)
     else:
-        print("🔍 Aperçu 1ère ligne de données :", rows[1])
+        message = f"⚠️ Le fichier *{file_title}* est accessible, mais l’onglet `Interface` est introuvable.\n\n🗂️ Onglets visibles pour le bot :\n" + "\n".join(f"- {name}" for name in sheet_names)
+
 except Exception as e:
-    print("❌ Erreur lecture des lignes :", e)
-    exit(1)
+    message = f"❌ Erreur accès fichier Google Sheet :\n{str(e)}"
+    print(message)
 
-# === Envoi rapport test via Telegram ===
-msg = f"""✅ Rapport d’intégration :
-- Google Sheet OK
-- Feuille 'Interface' OK
-- {len(rows)-1} ligne(s) lue(s)
-"""
-
+# Étape 3 : Envoi via Telegram
 try:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": msg
-    }
-    r = requests.post(url, data=payload)
-    print(f"📤 Message Telegram envoyé : {r.status_code}")
-    print(r.text)
+    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    response = requests.post(url, data=payload)
+    print(f"📤 Telegram envoyé : {response.status_code}")
 except Exception as e:
-    print("❌ Erreur envoi Telegram :", e)
+    print("❌ Échec envoi Telegram :", e)
