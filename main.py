@@ -1,12 +1,16 @@
 from fastapi import FastAPI, Request
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 import os
 import json
 
 # === Imports organisés ===
 from handlers.start_handler import start
 from handlers.message_handler import handle_message
+from handlers.quittance_handler import (
+    handle_quittance_command,
+    handle_quittance_selection,
+)
 
 # === Initialisation FastAPI ===
 app = FastAPI()
@@ -21,6 +25,8 @@ dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(CommandHandler("quittance", handle_quittance_command))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram ===
