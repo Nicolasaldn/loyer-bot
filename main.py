@@ -2,52 +2,41 @@ import os
 import json
 import gspread
 import requests
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
-print("🧪 Test complet d’accès Google Sheet")
+print("🧪 Test : visibilité des fichiers Google Drive")
 
-# Récupération des variables d’environnement
+# Variables
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
 
-# Étape 1 : Authentification
 try:
     creds_dict = json.loads(raw_creds)
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    print("✅ Connexion Google API OK")
-except Exception as e:
-    print("❌ Authentification Google Sheets échouée :", e)
-    exit(1)
 
-# Étape 2 : Ouverture du fichier et récupération des onglets
-try:
-    spreadsheet = client.open_by_key(SHEET_ID)
-    file_title = spreadsheet.title
-    worksheets = spreadsheet.worksheets()
-    sheet_names = [ws.title for ws in worksheets]
+    # Création credentials Google API v3
+    scopes = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
 
-    print(f"📄 Fichier : {file_title}")
-    print("🗂️ Onglets trouvés :", sheet_names)
+    service = build("drive", "v3", credentials=credentials)
 
-    # Message à envoyer par Telegram
-    if "Interface" in sheet_names:
-        message = f"✅ Le fichier *{file_title}* est accessible.\n✅ L’onglet `Interface` existe bien.\n\n🗂️ Autres onglets trouvés :\n" + "\n".join(f"- {name}" for name in sheet_names)
+    # Requête : liste les fichiers visibles
+    results = service.files().list(
+        pageSize=10,
+        fields="files(id, name, mimeType)"
+    ).execute()
+
+    files = results.get("files", [])
+
+    if not files:
+        message = "⚠️ Aucun fichier Google Sheet visible par le bot."
     else:
-        message = f"⚠️ Le fichier *{file_title}* est accessible, mais l’onglet `Interface` est introuvable.\n\n🗂️ Onglets visibles pour le bot :\n" + "\n".join(f"- {name}" for name in sheet_names)
+        message = "📂 Fichiers visibles :\n" + "\n".join(f"- {f['name']} ({f['id']})" for f in files)
 
 except Exception as e:
-    message = f"❌ Erreur accès fichier Google Sheet :\n{str(e)}"
-    print(message)
+    message = f"❌ Erreur Drive API : {str(e)}"
 
-# Étape 3 : Envoi via Telegram
-try:
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
-    response = requests.post(url, data=payload)
-    print(f"📤 Telegram envoyé : {response.status_code}")
-except Exception as e:
-    print("❌ Échec envoi Telegram :", e)
+# Envoi du message Telegram
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+requests.post(url, data={"chat_id": CHAT_ID, "text": message})
