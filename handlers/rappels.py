@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
     chat_id = update.message.chat_id
-    data = get_sheet_data()  # ✅ on ne saute plus de lignes
+    data = get_sheet_data()  # get_all_records() retourne une liste de dicts
     db_dict = get_db_dict()
 
     logger.info(f"[DEBUG] Commande reçue : {command}")
-    logger.info(f"[DEBUG] Liste des noms de la feuille : {[row[1] for row in data]}")
+    logger.info(f"[DEBUG] Liste des noms de la feuille : {[row['Nom'] for row in data if 'Nom' in row]}")
 
     if command["type"] == "all":
         await context.bot.send_message(
@@ -22,7 +22,7 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
             text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}..."
         )
         for row in data:
-            if len(row) >= 9:
+            if len(row) >= 5:
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
 
     elif command["type"] == "single":
@@ -32,9 +32,8 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
         )
         found = False
         for row in data:
-            logger.info(f"[DEBUG] Comparaison : {command['nom'].lower()} vs {row[1].strip().lower()}")
-            if command['nom'].lower() in row[1].strip().lower():
-                logger.info(f"[DEBUG] ➤ LOCATAIRE TROUVÉ : {row[1]}")
+            if "Nom" in row and command['nom'].lower() in row["Nom"].strip().lower():
+                logger.info(f"[DEBUG] ➤ LOCATAIRE TROUVÉ : {row['Nom']}")
                 found = True
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
                 break
@@ -44,23 +43,25 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     try:
-        logger.info(f"[DEBUG] ➤ Début pour : {row[1]}")
+        nom = row["Nom"].strip().title()
+        logger.info(f"[DEBUG] ➤ Début pour : {nom}")
+
         locataire = {
-            "nom": row[1].strip().title(),
-            "adresse": row[2].strip(),
-            "loyer": float(row[3])
+            "nom": nom,
+            "adresse": row["Adresse"].strip(),
+            "loyer": float(row["Loyer TTC (€)"])
         }
         logger.info(f"[DEBUG] ➤ Loyer : {locataire['loyer']} €")
 
-        proprio = row[5].strip()
+        proprio = row["Proprietaire"].strip()
         proprio_adresse = db_dict.get(proprio, "[adresse non trouvée]")
-        frequence = row[4].strip()
+        frequence = row["Fréquence"].strip()
 
         pdf = AvisLoyerPDF()
         pdf.add_page()
         pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
 
-        filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
+        filename = f"/tmp/Avis_{nom.replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
         pdf.output(filename)
         logger.info(f"[DEBUG] ➤ PDF sauvegardé dans : {filename}")
 
