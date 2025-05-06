@@ -1,91 +1,53 @@
-from datetime import datetime
 from telegram import Update, InputFile
 from telegram.ext import ContextTypes
-from pdf.avis import AvisLoyerPDF
-from handlers.utils import get_sheet_data, get_db_dict
-import os
-import logging
+from utils.parser import parse_command
+from utils.gsheet import get_worksheets
+from pdf.avis_loyer import AvisLoyerPDF
+from datetime import timedelta
 
-logger = logging.getLogger(__name__)
-
-async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
-    chat_id = update.message.chat_id
-
-    if command["date"] is None:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Merci d’indiquer une date valide, ex : `rappel Thomas Cohen 07/05/2025`"
-        )
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
         return
 
-    data = get_sheet_data()
-    db_dict = get_db_dict()
+    text = update.message.text
+    chat_id = update.message.chat_id
+    command = parse_command(text)
 
-    logger.info(f"[DEBUG] Commande reçue : {command}")
-    logger.info(f"[DEBUG] Liste des noms de la feuille : {[row['Nom'] for row in data if 'Nom' in row]}")
+    sheet_interface, sheet_db = get_worksheets()
+    db_data = sheet_db.get_all_values()[1:]
+    db_dict = {row[0]: row[1] for row in db_data}
+    data = sheet_interface.get_all_values()[5:]
 
-    if command["type"] == "all":
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}..."
-        )
+    if "error" in command:
+        await context.bot.send_message(chat_id=chat_id, text="⛔ " + command["error"])
+    elif command["type"] == "all":
+        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
         for row in data:
-            if "Nom" in row:
-                await generate_and_send_pdf(row, db_dict, command["date"], context, chat_id)
-
+            if len(row) >= 8 and row[7].strip().lower() == 'true':
+                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
     elif command["type"] == "single":
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"📄 Génération du rappel pour {command['nom']}..."
-        )
-        found = False
+        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
         for row in data:
-            if "Nom" in row and command["nom"].lower() in row["Nom"].strip().lower():
-                logger.info(f"[DEBUG] ➤ LOCATAIRE TROUVÉ : {row['Nom']}")
-                found = True
-                await generate_and_send_pdf(row, db_dict, command["date"], context, chat_id)
-                break
-        if not found:
-            logger.warning(f"[DEBUG] ❌ Locataire introuvable pour : {command['nom']}")
-            await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable.")
+            if row[1].strip().lower() == command['nom'].lower() and row[7].strip().lower() == 'true':
+                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
+                return
+        await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable ou non à relancer.")
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
-    try:
-        if date_rappel is None:
-            logger.error("[ERREUR] date_rappel est None")
-            await context.bot.send_message(chat_id=chat_id, text="❌ Date de rappel manquante.")
-            return
+    locataire = {
+        "nom": row[1].strip().title(),
+        "adresse": row[3].strip(),
+        "loyer": float(row[4])
+    }
+    proprio = row[6].strip()
+    proprio_adresse = db_dict.get(proprio, "")
+    frequence = row[5].strip()
 
-        nom = row["Nom"].strip().title()
-        logger.info(f"[DEBUG] ➤ Début pour : {nom}")
+    pdf = AvisLoyerPDF()
+    pdf.add_page()
+    pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
+    filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
+    pdf.output(filename)
 
-        locataire = {
-            "nom": nom,
-            "adresse": row["Adresse"].strip(),
-            "loyer": float(row["Loyer TTC (€)"])
-        }
-        logger.info(f"[DEBUG] ➤ Loyer : {locataire['loyer']} €")
-
-        proprio = row["Proprietaire"].strip()
-        proprio_adresse = db_dict.get(proprio, "[adresse non trouvée]")
-        frequence = row["Fréquence"].strip()
-
-        pdf = AvisLoyerPDF()
-        pdf.add_page()
-        pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
-
-        filename = f"/tmp/Avis_{nom.replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
-        pdf.output(filename)
-        logger.info(f"[DEBUG] ➤ PDF sauvegardé dans : {filename}")
-
-        with open(filename, "rb") as f:
-            await context.bot.send_document(
-                chat_id=chat_id,
-                document=InputFile(f),
-                filename=os.path.basename(filename)
-            )
-            logger.info(f"[DEBUG] ✅ PDF envoyé à Telegram")
-
-    except Exception as e:
-        logger.error(f"[ERREUR] ❌ Exception lors du traitement : {e}")
-        await context.bot.send_message(chat_id=chat_id, text="❌ Erreur lors de la génération ou de l'envoi du PDF.")
+    with open(filename, "rb") as f:
+        await context.bot.send_document(chat_id=chat_id, document=InputFile(f), filename=filename.split("/")[-1])
