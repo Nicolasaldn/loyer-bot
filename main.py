@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import re
 import requests
 from datetime import datetime, timedelta
@@ -116,12 +115,26 @@ spreadsheet = client.open(SHEET_NAME)
 sheet_interface = spreadsheet.worksheet("Interface")
 sheet_db = spreadsheet.worksheet("DB")
 
-# === Traitement unique d'un seul message entrant ===
+# === Traitement du dernier message non traité ===
 updates = requests.get(f"{BASE_URL}/getUpdates").json()
-messages = updates.get("result", [])
+messages = sorted(updates.get("result", []), key=lambda x: x["update_id"])
 
 if messages:
     last_msg = messages[-1]
+    update_id = last_msg["update_id"]
+
+    # Vérifie si ce message a déjà été traité
+    last_id_path = "/tmp/last_update_id.txt"
+    if os.path.exists(last_id_path):
+        with open(last_id_path, "r") as f:
+            last_seen = int(f.read().strip())
+        if update_id <= last_seen:
+            exit()  # déjà traité, on quitte
+
+    # Enregistre l'ID actuel comme le dernier traité
+    with open(last_id_path, "w") as f:
+        f.write(str(update_id))
+
     text = last_msg["message"].get("text", "")
     command = process_message(text)
 
@@ -130,8 +143,8 @@ if messages:
 
     elif command["type"] == "all":
         send_message(f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')} en cours…")
-        data = sheet_interface.get_all_values()[5:]  # skip headers
-        db_data = sheet_db.get_all_values()[1:]  # skip headers
+        data = sheet_interface.get_all_values()[5:]
+        db_data = sheet_db.get_all_values()[1:]
         db_dict = {row[0]: row[1] for row in db_data}
         for row in data:
             if len(row) >= 7 and row[6].strip().lower() == 'true':
@@ -152,7 +165,7 @@ if messages:
 
     elif command["type"] == "single":
         send_message(f"📄 Génération du rappel pour {command['nom']} en cours…")
-        data = sheet_interface.get_all_values()[5:]  # skip headers
+        data = sheet_interface.get_all_values()[5:]
         db_data = sheet_db.get_all_values()[1:]
         db_dict = {row[0]: row[1] for row in db_data}
         for row in data:
