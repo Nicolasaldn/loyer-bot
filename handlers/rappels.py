@@ -4,6 +4,9 @@ from telegram.ext import ContextTypes
 from pdf.avis import AvisLoyerPDF
 from handlers.utils import get_sheet_data, get_db_dict
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
     chat_id = update.message.chat_id
@@ -11,13 +14,19 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
     db_dict = get_db_dict()
 
     if command["type"] == "all":
-        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}..."
+        )
         for row in data:
             if len(row) >= 9:
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
 
     elif command["type"] == "single":
-        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"📄 Génération du rappel pour {command['nom']}..."
+        )
         found = False
         for row in data:
             if command['nom'].lower() in row[0].strip().lower():
@@ -29,13 +38,13 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     try:
-        print(f"[DEBUG] ➤ Début pour : {row[0]}")
+        logger.info(f"[DEBUG] ➤ Début pour : {row[0]}")
         locataire = {
             "nom": row[0].strip().title(),
             "adresse": row[2].strip(),
             "loyer": float(row[3])
         }
-        print(f"[DEBUG] ➤ Loyer : {locataire['loyer']} €")
+        logger.info(f"[DEBUG] ➤ Loyer : {locataire['loyer']} €")
 
         proprio = row[5].strip()
         proprio_adresse = db_dict.get(proprio, "[adresse non trouvée]")
@@ -47,7 +56,7 @@ async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
 
         filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
         pdf.output(filename)
-        print(f"[DEBUG] ➤ PDF sauvegardé dans : {filename}")
+        logger.info(f"[DEBUG] ➤ PDF sauvegardé dans : {filename}")
 
         with open(filename, "rb") as f:
             await context.bot.send_document(
@@ -55,8 +64,8 @@ async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
                 document=InputFile(f),
                 filename=os.path.basename(filename)
             )
-            print(f"[DEBUG] ✅ PDF envoyé à Telegram")
+            logger.info(f"[DEBUG] ✅ PDF envoyé à Telegram")
 
     except Exception as e:
-        print(f"[ERREUR] ❌ Exception lors du traitement : {e}")
+        logger.error(f"[ERREUR] ❌ Exception lors du traitement : {e}")
         await context.bot.send_message(chat_id=chat_id, text="❌ Erreur lors de la génération ou de l'envoi du PDF.")
