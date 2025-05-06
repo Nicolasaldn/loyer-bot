@@ -11,11 +11,23 @@ def get_gsheet_client():
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     return gspread.authorize(creds)
 
-# Lecture des données de l’onglet Interface
+# Lecture des données de l’onglet Interface avec vérification des en-têtes
 def get_sheet_data():
     client = get_gsheet_client()
     sheet = client.open_by_key(os.getenv("GOOGLE_SHEET_ID"))
-    return sheet.worksheet("Interface").get_all_records()
+    ws = sheet.worksheet("Interface")
+    
+    # Lecture brute des en-têtes en ligne 1
+    raw_headers = ws.row_values(1)
+    
+    # Nettoyage des en-têtes pour détecter les doublons cachés
+    headers = [h.strip().replace('\xa0', ' ').replace('\n', '').lower() for h in raw_headers]
+
+    if len(headers) != len(set(headers)):
+        duplicates = [h for h in headers if headers.count(h) > 1]
+        raise ValueError(f"❌ En-têtes dupliqués détectés dans la feuille 'Interface' : {duplicates}")
+    
+    return ws.get_all_records()
 
 # Lecture robuste de l’onglet DB avec gestion des cas tordus
 def get_db_dict():
