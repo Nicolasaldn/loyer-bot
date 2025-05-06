@@ -17,3 +17,16 @@ def get_sheet_data(sheet_id, tab_name):
 def get_db_dict(sheet_id, tab_name):
     records = get_sheet_data(sheet_id, tab_name)
     return {r["Nom"]: r["Adresse"] for r in records}
+
+def parse_command(message_text):
+    """
+    Exemple simple de parsing : sépare par espace
+    """
+    parts = message_text.strip().lower().split()
+
+    if "rappel" in parts:
+        return "rappel", parts
+    elif "quittance" in parts:
+        return "quittance", parts
+    else:
+        return "unknown", parts
