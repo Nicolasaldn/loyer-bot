@@ -15,8 +15,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 bot_app = Application.builder().token(TOKEN).build()
 app = FastAPI()
 
-# Gestion des messages Telegram entrants
-@bot_app.message_handler()
+# Handler pour les messages texte
 async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     source, args = parse_command(text)
@@ -27,6 +26,9 @@ async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_quittance(update, context, *args)
     else:
         await update.message.reply_text("Commande inconnue. Utilise 'rappel' ou 'quittance'.")
+
+# Ajout du handler
+bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_message))
 
 # Endpoint FastAPI pour recevoir les webhooks Telegram
 @app.post("/webhook")
