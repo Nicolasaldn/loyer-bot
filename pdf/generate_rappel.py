@@ -1,5 +1,3 @@
-# pdf/generate_rappel.py
-
 from fpdf import FPDF
 import os
 
@@ -18,12 +16,12 @@ def generate_rappel_pdf(nom_locataire: str, mois: str, montant: float = 800.0, o
     pdf.add_page()
     pdf.set_font("Helvetica", "", 12)
 
-    # Corps du message
+    # Corps du message - version ASCII safe
     pdf.ln(10)
     pdf.multi_cell(0, 10, 
         f"Bonjour {nom_locataire},\n\n"
-        f"Nous vous rappelons que le loyer du mois de {mois} d’un montant de {montant:.2f} € reste à régler.\n"
-        f"Merci de procéder au paiement dans les plus brefs délais.\n\n"
+        f"Nous vous rappelons que le loyer du mois de {mois} d'un montant de {montant:.2f} € reste a regler.\n"
+        f"Merci de proceder au paiement dans les plus brefs delais.\n\n"
         f"Cordialement,\nVotre gestionnaire de biens"
     )
 
