@@ -1,92 +1,85 @@
-from datetime import datetime
-from telegram import Update, InputFile
-from telegram.ext import ContextTypes
-from pdf.avis import AvisLoyerPDF
-from handlers.utils import get_sheet_data, get_db_dict
 import os
-import logging
+import json
+import gspread
+from datetime import datetime
+from oauth2client.service_account import ServiceAccountCredentials
+import re
 
-logger = logging.getLogger(__name__)
+# Connexion Google Sheets via Service Account
+def get_gsheet_client():
+    creds_dict = json.loads(os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON"))
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    return gspread.authorize(creds)
 
-async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
-    chat_id = update.message.chat_id
+# Lecture des données de l’onglet Interface
+def get_sheet_data():
+    client = get_gsheet_client()
+    sheet = client.open_by_key(os.getenv("GOOGLE_SHEET_ID"))
+    return sheet.worksheet("Interface").get_all_records()
 
-    # Vérifie que la date est bien présente
-    if command["date"] is None:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Merci d’indiquer une date valide, ex : `rappel Thomas Cohen 06/05/2025`"
-        )
-        return
+# Lecture robuste de l’onglet DB avec gestion des cas tordus
+def get_db_dict():
+    client = get_gsheet_client()
+    sheet = client.open_by_key(os.getenv("GOOGLE_SHEET_ID"))
+    db_values = sheet.worksheet("DB").get_all_values()
 
-    data = get_sheet_data()
-    db_dict = get_db_dict()
+    if not db_values or len(db_values) < 2:
+        return {}
 
-    logger.info(f"[DEBUG] Commande reçue : {command}")
-    logger.info(f"[DEBUG] Liste des noms de la feuille : {[row['Nom'] for row in data if 'Nom' in row]}")
-
-    if command["type"] == "all":
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}..."
-        )
-        for row in data:
-            if len(row) >= 5:
-                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
-
-    elif command["type"] == "single":
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"📄 Génération du rappel pour {command['nom']}..."
-        )
-        found = False
-        for row in data:
-            if "Nom" in row and command['nom'].lower() in row["Nom"].strip().lower():
-                logger.info(f"[DEBUG] ➤ LOCATAIRE TROUVÉ : {row['Nom']}")
-                found = True
-                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
-                break
-        if not found:
-            logger.warning(f"[DEBUG] ❌ Locataire introuvable pour : {command['nom']}")
-            await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable.")
-
-async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
+    headers = [h.strip() for h in db_values[0]]
     try:
-        if date_rappel is None:
-            logger.error("[ERREUR] date_rappel est None")
-            await context.bot.send_message(chat_id=chat_id, text="❌ Date de rappel manquante.")
-            return
+        nom_index = headers.index("Nom")
+        adresse_index = headers.index("Adresse")
+    except ValueError:
+        raise ValueError("⚠️ L’un des en-têtes 'Nom' ou 'Adresse' est manquant ou mal écrit dans la feuille DB.")
 
-        nom = row["Nom"].strip().title()
-        logger.info(f"[DEBUG] ➤ Début pour : {nom}")
+    db_dict = {}
+    for row in db_values[1:]:
+        if len(row) > max(nom_index, adresse_index):
+            nom = row[nom_index].strip()
+            adresse = row[adresse_index].strip()
+            if nom:
+                db_dict[nom] = adresse
+    return db_dict
 
-        locataire = {
-            "nom": nom,
-            "adresse": row["Adresse"].strip(),
-            "loyer": float(row["Loyer TTC (€)"])
+# Tentative de conversion string en date
+def parse_date_from_text(text):
+    text = text.strip()
+    text = re.sub(r"[^\d/.\-]", "", text)  # Nettoie les caractères parasites
+
+    for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"]:
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+# Analyse de la commande utilisateur
+def parse_command(text):
+    text = text.strip()
+    if text.lower().startswith("rappel "):
+        body = text[7:].strip()
+        parts = body.rsplit(" ", 1)  # découpe "nom complet" + "date"
+        if len(parts) == 2:
+            nom = parts[0].strip()
+            date = parse_date_from_text(parts[1])
+            if nom.lower() in ["tous", "all"]:
+                return {
+                    "source": "rappel",
+                    "type": "all",
+                    "date": date
+                }
+            else:
+                return {
+                    "source": "rappel",
+                    "type": "single",
+                    "nom": nom,
+                    "date": date
+                }
+    elif text.lower().startswith("quittance "):
+        return {
+            "source": "quittance",
+            "nom": text[9:].strip()
         }
-        logger.info(f"[DEBUG] ➤ Loyer : {locataire['loyer']} €")
-
-        proprio = row["Proprietaire"].strip()
-        proprio_adresse = db_dict.get(proprio, "[adresse non trouvée]")
-        frequence = row["Fréquence"].strip()
-
-        pdf = AvisLoyerPDF()
-        pdf.add_page()
-        pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
-
-        filename = f"/tmp/Avis_{nom.replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
-        pdf.output(filename)
-        logger.info(f"[DEBUG] ➤ PDF sauvegardé dans : {filename}")
-
-        with open(filename, "rb") as f:
-            await context.bot.send_document(
-                chat_id=chat_id,
-                document=InputFile(f),
-                filename=os.path.basename(filename)
-            )
-            logger.info(f"[DEBUG] ✅ PDF envoyé à Telegram")
-
-    except Exception as e:
-        logger.error(f"[ERREUR] ❌ Exception lors du traitement : {e}")
-        await context.bot.send_message(chat_id=chat_id, text="❌ Erreur lors de la génération ou de l'envoi du PDF.")
+    return None
