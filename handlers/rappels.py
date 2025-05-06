@@ -13,16 +13,16 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
     if command["type"] == "all":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
         for row in data:
-            if len(row) >= 9 and str(row[6]).strip().lower() == 'true':  # ✅ Colonne H : "Rappel Paiement"
+            if len(row) >= 9:
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
 
     elif command["type"] == "single":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
         for row in data:
-            if row[0].strip().lower() == command['nom'].lower() and str(row[6]).strip().lower() == 'true':
+            if row[0].strip().lower() == command['nom'].lower():
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
                 return
-        await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable ou non à relancer.")
+        await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable.")
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     locataire = {
