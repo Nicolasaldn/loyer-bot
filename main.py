@@ -5,11 +5,16 @@ from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from fpdf import FPDF
-from telegram import Update, InputFile
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, InputFile, Bot
+from telegram.ext import ContextTypes
+from fastapi import FastAPI, Request
+from telegram.constants import ParseMode
+from telegram.ext import Application, MessageHandler, filters
+import uvicorn
 
 # === Configuration ===
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Ex: https://loyer-bot.onrender.com/webhook
 SHEET_NAME = "RE - Gestion"
 raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
 
@@ -98,24 +103,23 @@ def parse_command(text):
 
 # === Handler principal ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
+        return
     text = update.message.text
     chat_id = update.message.chat_id
     command = parse_command(text)
-
-    if "error" in command:
-        await context.bot.send_message(chat_id=chat_id, text="⛔ " + command["error"])
-        return
 
     db_data = sheet_db.get_all_values()[1:]
     db_dict = {row[0]: row[1] for row in db_data}
     data = sheet_interface.get_all_values()[5:]
 
-    if command["type"] == "all":
+    if "error" in command:
+        await context.bot.send_message(chat_id=chat_id, text="⛔ " + command["error"])
+    elif command["type"] == "all":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
         for row in data:
             if len(row) >= 8 and row[7].strip().lower() == 'true':
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
-
     elif command["type"] == "single":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
         for row in data:
@@ -144,9 +148,23 @@ async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     with open(filename, "rb") as f:
         await context.bot.send_document(chat_id=chat_id, document=InputFile(f), filename=os.path.basename(filename))
 
-# === Lancement du bot ===
+# === FastAPI Webhook Server ===
+app = FastAPI()
+telegram_app = Application.builder().token(BOT_TOKEN).build()
+telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+@app.on_event("startup")
+async def startup():
+    bot = Bot(BOT_TOKEN)
+    await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, telegram_app.bot)
+    await telegram_app.process_update(update)
+    return {"status": "ok"}
+
+# === Local run (utile si testé en local avec ngrok) ===
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Bot prêt à recevoir des messages…")
-    app.run_polling()
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
