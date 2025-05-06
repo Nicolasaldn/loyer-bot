@@ -10,6 +10,7 @@ from utils.state import (
 from utils.parser import extract_name_and_date, parse_quittance_period
 from pdf.generate_rappel import generate_rappel_pdf
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
+from datetime import datetime
 import os
 import zipfile
 
@@ -54,7 +55,7 @@ def handle_message(update: Update, context: CallbackContext):
     if state.get("action") == "quittance" and state.get("name"):
         try:
             date_debut, date_fin = parse_quittance_period(message_text)
-        except ValueError as e:
+        except ValueError:
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text="Je n’ai pas compris la période. Essaie par exemple :\n→ janvier 2024\n→ de février 2024 à avril 2024"
@@ -66,7 +67,8 @@ def handle_message(update: Update, context: CallbackContext):
 
         # Un mois : 1 quittance
         if date_debut == date_fin:
-            filepath = generate_quittance_pdf(nom, date_debut)
+            date_obj = datetime.strptime(date_debut, "%d/%m/%Y")
+            filepath = generate_quittance_pdf(nom, date_obj)
             context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
         else:
             fichiers = generate_quittances_pdf(nom, date_debut, date_fin)
