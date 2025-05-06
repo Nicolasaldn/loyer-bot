@@ -1,60 +1,42 @@
-import os
 from fastapi import FastAPI, Request
 from telegram import Update
-from telegram.ext import Application, ContextTypes, MessageHandler, CommandHandler, filters
-import uvicorn
+from telegram.ext import Application, ContextTypes, MessageHandler, filters
+import os
+
 from handlers.rappels import handle_rappel
+from handlers.quittances import handle_quittance
 from handlers.utils import parse_command
 
-BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+# Chargement des variables d'environnement
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
+# Initialisation du bot Telegram
+bot_app = Application.builder().token(TOKEN).build()
 app = FastAPI()
-telegram_app = Application.builder().token(BOT_TOKEN).build()
 
-
+# Gestion des messages Telegram entrants
+@bot_app.message_handler()
 async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message is None:
-        return
-
     text = update.message.text
-    command = parse_command(text)
+    source, args = parse_command(text)
 
-    if command.get("source") == "rappel":
-        await handle_rappel(update, context, command)
-    elif command.get("source") == "quittance":
-        await context.bot.send_message(chat_id=update.message.chat_id, text="📦 Fonction quittance à venir…")
+    if source == "rappel":
+        await handle_rappel(update, context, *args)
+    elif source == "quittance":
+        await handle_quittance(update, context, *args)
     else:
-        await context.bot.send_message(chat_id=update.message.chat_id, text="⛔ Commande non reconnue.")
+        await update.message.reply_text("Commande inconnue. Utilise 'rappel' ou 'quittance'.")
 
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Bienvenue sur le bot de gestion locative !\n\n"
-        "Voici ce que tu peux faire :\n"
-        "- `rappel thomas cohen 06/05/2025`\n"
-        "- `rappels 06/05/2025`\n"
-        "- `quittance thomas cohen mai`\n"
-        "- `quittance thomas cohen de janvier 2023 à mars 2023`\n\n"
-        "Je t'enverrai les fichiers PDF ou ZIP selon le cas.\n",
-        parse_mode="Markdown"
-    )
-
-telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_message))
-telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(CommandHandler("help", start))
-
-@app.on_event("startup")
-async def startup():
-    await telegram_app.initialize()
-    await telegram_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-
+# Endpoint FastAPI pour recevoir les webhooks Telegram
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
-    return {"status": "ok"}
+    update = Update.de_json(data, bot_app.bot)
+    await bot_app.process_update(update)
+    return {"ok": True}
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+# Définition du webhook à l'initialisation
+@app.on_event("startup")
+async def startup():
+    await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
