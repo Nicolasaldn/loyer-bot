@@ -1,3 +1,33 @@
+import os
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+def get_worksheets():
+    raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
+    creds_dict = json.loads(raw_creds)
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    spreadsheet = client.open("RE - Gestion")
+    return spreadsheet.worksheet("Interface"), spreadsheet.worksheet("DB")
+import re
+from datetime import datetime
+
+def parse_command(text):
+    match_all = re.match(r"rappels\s+(\d{2}/\d{2}/\d{4})", text.lower())
+    if match_all:
+        return {"type": "all", "date": datetime.strptime(match_all.group(1), "%d/%m/%Y")}
+
+    match_one = re.match(r"rappel\s+(.+?)\s+(\d{2}/\d{2}/\d{4})", text.lower())
+    if match_one:
+        return {
+            "type": "single",
+            "nom": match_one.group(1).strip().title(),
+            "date": datetime.strptime(match_one.group(2), "%d/%m/%Y")
+        }
+
+    return {"error": "Commande non reconnue."}
 from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 from utils.parser import parse_command
