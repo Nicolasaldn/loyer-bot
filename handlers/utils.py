@@ -34,13 +34,28 @@ def parse_date_from_text(text):
             continue
     return None
 
-# Analyse de la commande utilisateur
 def parse_command(text):
     text = text.strip()
     if text.lower().startswith("rappel "):
         parts = text.split(" ", 2)
         if len(parts) == 3:
-            return "rappel", [parts[1], parts[2]]
+            date = parse_date_from_text(parts[2])
+            if parts[1].lower() in ["tous", "all"]:
+                return {
+                    "source": "rappel",
+                    "type": "all",
+                    "date": date
+                }
+            else:
+                return {
+                    "source": "rappel",
+                    "type": "single",
+                    "nom": parts[1],
+                    "date": date
+                }
     elif text.lower().startswith("quittance "):
-        return "quittance", [text[9:].strip()]
-    return None, []
+        return {
+            "source": "quittance",
+            "nom": text[9:].strip()
+        }
+    return None
