@@ -3,25 +3,27 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-print("🧪 Test ouverture Google Sheet avec logs détaillés")
+print("🧪 Test ouverture du fichier par nom")
 
-SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+# === Variables ===
+SHEET_NAME = "RE - Gestion"
 raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
 
 try:
-    print("🔐 Lecture JSON…")
     creds_dict = json.loads(raw_creds)
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    print("✅ Authentification réussie")
+    print("✅ Auth OK")
 
-    print(f"📄 Tentative d’ouverture du fichier ID = {SHEET_ID}")
-    spreadsheet = client.open_by_key(SHEET_ID)
+    spreadsheet = client.open(SHEET_NAME)  # Ouvre le fichier par son nom, plus robuste ici
     print(f"✅ Fichier ouvert : {spreadsheet.title}")
 
     worksheets = spreadsheet.worksheets()
     print("🗂️ Onglets disponibles :", [ws.title for ws in worksheets])
 
+    sheet = spreadsheet.worksheet("Interface")
+    print("✅ Onglet 'Interface' accessible")
+
 except Exception as e:
-    print(f"❌ Exception capturée : {repr(e)}")
+    print(f"❌ Erreur capturée : {repr(e)}")
