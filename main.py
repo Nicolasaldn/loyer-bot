@@ -1,6 +1,6 @@
-from fastapi import FastAPI
-from telegram import Update, Bot
-from telegram.ext import CommandHandler, MessageHandler, Filters, Updater, CallbackContext
+from fastapi import FastAPI, Request
+from telegram import Bot, Update
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
@@ -8,15 +8,17 @@ import json
 
 app = FastAPI()
 
-# --- Load ENV VARIABLES ---
+# --- ENV ---
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GOOGLE_SHEET_CREDENTIALS = json.loads(os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON"))
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 TAB_INTERFACE = "Interface"
-TAB_DB = "DB"
 
-# --- GOOGLE SHEETS ---
+bot = Bot(token=TELEGRAM_TOKEN)
+dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
+
+# --- Google Sheets ---
 def get_worksheet(tab_name):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(GOOGLE_SHEET_CREDENTIALS, scope)
@@ -31,31 +33,35 @@ def list_tenants():
     name_idx = header.index("Nom")
     return [row[name_idx] for row in values[1:] if row[name_idx]]
 
-# --- TELEGRAM HANDLERS ---
-def start(update: Update, context: CallbackContext):
+# --- Handlers ---
+def start(update: Update, context):
     tenants = list_tenants()
-    message = "Salut ! Voici les locataires disponibles :\n\n"
-    for tenant in tenants:
-        message += f"• {tenant}\n"
+    message = "Voici les locataires disponibles :\n"
+    for t in tenants:
+        message += f"• {t}\n"
     message += "\nSouhaites-tu envoyer un rappel à quelqu’un ?"
-    update.message.reply_text(message)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
-def handle_message(update: Update, context: CallbackContext):
-    text = update.message.text.lower()
-    if "rappel" in text:
-        update.message.reply_text("À quel locataire souhaites-tu envoyer un rappel ? (Tape son nom)")
+def handle_message(update: Update, context):
+    txt = update.message.text.lower()
+    if "rappel" in txt:
+        context.bot.send_message(chat_id=update.effective_chat.id, text="À quel locataire souhaites-tu envoyer un rappel ?")
     else:
-        update.message.reply_text("Je peux t’aider à envoyer des rappels de loyer. Tape /start pour commencer.")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Je peux t’aider à envoyer des rappels. Tape /start.")
 
-# --- TELEGRAM APP ---
-def setup_bot():
-    updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    updater.start_polling()
-    updater.idle()
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
-# --- MAIN ---
-if __name__ == "__main__":
-    setup_bot()
+# --- Webhook route ---
+@app.post("/webhook")
+async def webhook(req: Request):
+    data = await req.json()
+    update = Update.de_json(data, bot)
+    dispatcher.process_update(update)
+    return {"ok": True}
+
+# --- Set webhook at startup ---
+@app.on_event("startup")
+async def set_webhook():
+    webhook_url = os.getenv("WEBHOOK_URL") + "/webhook"
+    bot.set_webhook(url=webhook_url)
