@@ -1,45 +1,62 @@
-from fastapi import FastAPI, Request
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-from telegram.ext import MessageHandler, filters
-from telegram.ext import Defaults
-from handlers.rappels import handle_rappel
-from handlers.quittances import handle_quittance
-from handlers.utils import parse_command
 import os
-import asyncio
+import json
+import gspread
+from datetime import datetime
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Initialisation du bot Telegram
-bot_app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
+# Connexion Google Sheets via Service Account
+def get_gsheet_client():
+    creds_dict = json.loads(os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON"))
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    return gspread.authorize(creds)
 
-# Fonction de routing des messages
-async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    command = parse_command(text)
+# Lecture des données de l’onglet Interface
+def get_sheet_data():
+    client = get_gsheet_client()
+    sheet = client.open_by_key(os.getenv("GOOGLE_SHEET_ID"))
+    interface = sheet.worksheet("Interface").get_all_records()
+    return interface
 
-    if not command:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Commande invalide.")
-        return
+# Dictionnaire des propriétaires depuis l’onglet DB
+def get_db_dict():
+    client = get_gsheet_client()
+    sheet = client.open_by_key(os.getenv("GOOGLE_SHEET_ID"))
+    db = sheet.worksheet("DB").get_all_records()
+    return {row["Nom"]: row["Adresse"] for row in db if row["Nom"]}
 
-    if command["source"] == "rappel":
-        await handle_rappel(update, context, command)
-    elif command["source"] == "quittance":
-        await handle_quittance(update, context, command)
+# Tentative de conversion string en date
+def parse_date_from_text(text):
+    for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"]:
+        try:
+            return datetime.strptime(text.strip(), fmt)
+        except ValueError:
+            continue
+    return None
 
-# Ajout du handler pour tous les messages texte
-bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_message))
-
-# Initialisation FastAPI
-app = FastAPI()
-
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(bot_app.initialize())
-    asyncio.create_task(bot_app.start())
-
-@app.post("/webhook")
-async def webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, bot_app.bot)
-    await bot_app.process_update(update)
-    return {"status": "ok"}
+# Analyse de la commande utilisateur
+def parse_command(text):
+    text = text.strip()
+    if text.lower().startswith("rappel "):
+        parts = text.split(" ", 2)
+        if len(parts) == 3:
+            date = parse_date_from_text(parts[2])
+            if parts[1].lower() in ["tous", "all"]:
+                return {
+                    "source": "rappel",
+                    "type": "all",
+                    "date": date
+                }
+            else:
+                return {
+                    "source": "rappel",
+                    "type": "single",
+                    "nom": parts[1],
+                    "date": date
+                }
+    elif text.lower().startswith("quittance "):
+        return {
+            "source": "quittance",
+            "nom": text[9:].strip()
+        }
+    return None
