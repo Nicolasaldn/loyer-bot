@@ -15,9 +15,9 @@ def extract_name_and_date(message: str):
     date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", message)
     if date_match:
         try:
-            date_obj = datetime.strptime(date_match.group(1), "%d/%m/%Y")
-            formatted_date = date_obj.strftime("%B %Y")  # ex: January 2025
-            return found_name, formatted_date
+            # test si la date est valide
+            datetime.strptime(date_match.group(1), "%d/%m/%Y")
+            return found_name, date_match.group(1)
         except ValueError:
             pass
 
