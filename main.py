@@ -113,13 +113,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if command["type"] == "all":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
         for row in data:
-            if len(row) >= 7 and row[6].strip().lower() == 'true':
+            if len(row) >= 8 and row[7].strip().lower() == 'true':
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
 
     elif command["type"] == "single":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
         for row in data:
-            if row[0].strip().lower() == command['nom'].lower() and row[6].strip().lower() == 'true':
+            if row[1].strip().lower() == command['nom'].lower() and row[7].strip().lower() == 'true':
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
                 return
         await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable ou non à relancer.")
@@ -127,13 +127,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # === Génération PDF ===
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     locataire = {
-        "nom": row[0].strip().title(),
-        "adresse": row[2].strip(),
-        "loyer": float(row[3])
+        "nom": row[1].strip().title(),
+        "adresse": row[3].strip(),
+        "loyer": float(row[4])
     }
-    proprio = row[5].strip()
+    proprio = row[6].strip()
     proprio_adresse = db_dict.get(proprio, "")
-    frequence = row[4].strip()
+    frequence = row[5].strip()
 
     pdf = AvisLoyerPDF()
     pdf.add_page()
