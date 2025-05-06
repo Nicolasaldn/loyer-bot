@@ -1,9 +1,22 @@
+from datetime import datetime
+from telegram import Update, InputFile
+from telegram.ext import ContextTypes
+from pdf.avis import AvisLoyerPDF
+from handlers.utils import get_sheet_data, get_db_dict
+import os
+
 async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
     chat_id = update.message.chat_id
-    data = get_sheet_data()[5:]
+    data = get_sheet_data()[5:]  # ignore l’en-tête + lignes intro
     db_dict = get_db_dict()
 
-    if command["type"] == "single":
+    if command["type"] == "all":
+        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
+        for row in data:
+            if len(row) >= 9:
+                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
+
+    elif command["type"] == "single":
         await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
         found = False
         for row in data:
