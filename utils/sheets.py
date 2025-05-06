@@ -5,6 +5,7 @@ import json
 
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 TAB_INTERFACE = "Interface"
+TAB_DB = "DB"
 GOOGLE_SHEET_CREDENTIALS = json.loads(os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON"))
 
 def get_worksheet(tab_name):
@@ -22,3 +23,31 @@ def list_tenants():
     if name_idx is None:
         raise ValueError("Colonne des noms introuvable")
     return [row[name_idx] for row in values[1:] if row[name_idx]]
+
+def get_locataire_info(nom_locataire: str) -> dict:
+    interface = get_worksheet(TAB_INTERFACE)
+    db = get_worksheet(TAB_DB)
+
+    rows_interface = interface.get_all_records()
+    rows_db = db.get_all_records()
+
+    # Match locataire
+    loc_data = next((r for r in rows_interface if r["Nom"].strip().lower() == nom_locataire.strip().lower()), None)
+    if not loc_data:
+        raise ValueError(f"Locataire {nom_locataire} introuvable dans la feuille Interface.")
+
+    # Match bailleur
+    nom_bailleur = loc_data.get("Propriétaire") or loc_data.get("Proprietaire")
+    bail_data = next((r for r in rows_db if r["Nom du proprietaire"].strip().lower() == nom_bailleur.strip().lower()), None)
+    if not bail_data:
+        raise ValueError(f"Bailleur {nom_bailleur} introuvable dans la feuille DB.")
+
+    return {
+        "locataire_nom": loc_data["Nom"],
+        "locataire_adresse": loc_data["Adresse"],
+        "locataire_email": loc_data["Email"],
+        "bailleur_nom": nom_bailleur,
+        "bailleur_adresse": bail_data["Adresse"],
+        "loyer_ttc": float(loc_data["Loyer TTC (€)"]),
+        "frequence": loc_data["Fréquence"].lower()
+    }
