@@ -10,8 +10,11 @@ logger = logging.getLogger(__name__)
 
 async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, command):
     chat_id = update.message.chat_id
-    data = get_sheet_data()[5:]  # ignore l’en-tête + lignes intro
+    data = get_sheet_data()[5:]
     db_dict = get_db_dict()
+
+    logger.info(f"[DEBUG] Commande reçue : {command}")
+    logger.info(f"[DEBUG] Liste des noms de la feuille : {[row[1] for row in data]}")
 
     if command["type"] == "all":
         await context.bot.send_message(
@@ -29,18 +32,21 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
         )
         found = False
         for row in data:
-            if command['nom'].lower() in row[0].strip().lower():
+            logger.info(f"[DEBUG] Comparaison : {command['nom'].lower()} vs {row[1].strip().lower()}")
+            if command['nom'].lower() in row[1].strip().lower():
+                logger.info(f"[DEBUG] ➤ LOCATAIRE TROUVÉ : {row[1]}")
                 found = True
                 await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
                 break
         if not found:
+            logger.warning(f"[DEBUG] ❌ Locataire introuvable pour : {command['nom']}")
             await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable.")
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     try:
-        logger.info(f"[DEBUG] ➤ Début pour : {row[0]}")
+        logger.info(f"[DEBUG] ➤ Début pour : {row[1]}")
         locataire = {
-            "nom": row[0].strip().title(),
+            "nom": row[1].strip().title(),
             "adresse": row[2].strip(),
             "loyer": float(row[3])
         }
