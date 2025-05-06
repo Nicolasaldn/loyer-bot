@@ -16,7 +16,12 @@ async def route_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text.strip()
-    source, args = parse_command(text)
+    result = parse_command(text)
+if not result:
+    return  # ou un message d'erreur au besoin
+
+source, args = result
+
 
     if source == "rappel":
         await handle_rappel(update, context, *args)
