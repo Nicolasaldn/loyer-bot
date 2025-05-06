@@ -1,22 +1,27 @@
-from googleapiclient.discovery import build
-from google.oauth2.service_account import Credentials
 import os
 import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-print("📁 Listing des fichiers accessibles")
+print("🧪 Test ouverture Google Sheet avec logs détaillés")
 
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
-creds_dict = json.loads(raw_creds)
-scopes = ['https://www.googleapis.com/auth/drive.metadata.readonly']
-creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-service = build('drive', 'v3', credentials=creds)
 
-results = service.files().list(pageSize=50, fields="files(id, name)").execute()
-items = results.get('files', [])
+try:
+    print("🔐 Lecture JSON…")
+    creds_dict = json.loads(raw_creds)
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    print("✅ Authentification réussie")
 
-if not items:
-    print("❌ Aucun fichier accessible.")
-else:
-    print("📄 Fichiers accessibles :")
-    for item in items:
-        print(f"- {item['name']} (ID: {item['id']})")
+    print(f"📄 Tentative d’ouverture du fichier ID = {SHEET_ID}")
+    spreadsheet = client.open_by_key(SHEET_ID)
+    print(f"✅ Fichier ouvert : {spreadsheet.title}")
+
+    worksheets = spreadsheet.worksheets()
+    print("🗂️ Onglets disponibles :", [ws.title for ws in worksheets])
+
+except Exception as e:
+    print(f"❌ Exception capturée : {repr(e)}")
