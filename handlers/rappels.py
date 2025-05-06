@@ -29,28 +29,34 @@ async def handle_rappel(update: Update, context: ContextTypes.DEFAULT_TYPE, comm
 
 async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
     try:
-        print(f"[DEBUG] Traitement du locataire : {row[0]}")
+        print(f"[DEBUG] ➤ Début pour : {row[0]}")
         locataire = {
             "nom": row[0].strip().title(),
             "adresse": row[2].strip(),
             "loyer": float(row[3])
         }
-        print(f"[DEBUG] Loyer lu : {locataire['loyer']}")
+        print(f"[DEBUG] ➤ Loyer : {locataire['loyer']} €")
 
         proprio = row[5].strip()
-        proprio_adresse = db_dict.get(proprio, "Adresse inconnue")
+        proprio_adresse = db_dict.get(proprio, "[adresse non trouvée]")
         frequence = row[4].strip()
 
         pdf = AvisLoyerPDF()
         pdf.add_page()
         pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
+
         filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
         pdf.output(filename)
-        print(f"[DEBUG] PDF généré : {filename}")
+        print(f"[DEBUG] ➤ PDF sauvegardé dans : {filename}")
 
         with open(filename, "rb") as f:
-            await context.bot.send_document(chat_id=chat_id, document=InputFile(f), filename=os.path.basename(filename))
-            print(f"[DEBUG] PDF envoyé : {filename}")
+            await context.bot.send_document(
+                chat_id=chat_id,
+                document=InputFile(f),
+                filename=os.path.basename(filename)
+            )
+            print(f"[DEBUG] ✅ PDF envoyé à Telegram")
+
     except Exception as e:
-        print(f"[ERREUR PDF] {e}")
+        print(f"[ERREUR] ❌ Exception lors du traitement : {e}")
         await context.bot.send_message(chat_id=chat_id, text="❌ Erreur lors de la génération ou de l'envoi du PDF.")
