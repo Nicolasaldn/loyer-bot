@@ -23,17 +23,17 @@ except Exception as e:
     print("❌ Erreur d'authentification :", e)
     exit(1)
 
-# === Diagnostic : liste des onglets disponibles ===
+# === Accès à la feuille Interface ===
+message = ""
 try:
     spreadsheet = client.open_by_key(SHEET_ID)
+
+    # Diagnostic : liste les noms d’onglets
     worksheets = spreadsheet.worksheets()
     titles = [ws.title for ws in worksheets]
     print("🗂️ Onglets disponibles :", titles)
-except Exception as e:
-    print("❌ Erreur lors du listing des onglets :", e)
 
-# === Accès à la feuille Interface ===
-try:
+    # Accès à l’onglet 'Interface'
     sheet = spreadsheet.worksheet("Interface")
     rows = sheet.get_all_values()
     nb_rows = len(rows) - 1  # En-tête ignoré
