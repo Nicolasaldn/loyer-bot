@@ -1,13 +1,14 @@
 from fpdf import FPDF
 import os
 
-# Le fichier .ttf est directement dans le dossier /pdf
-FONT_PATH = "pdf/DejaVuSans.ttf"
+FONT_PATH_REGULAR = "pdf/DejaVuSans.ttf"
+FONT_PATH_BOLD = "pdf/DejaVuSans-Bold.ttf"
 
 class RappelPDF(FPDF):
     def __init__(self):
         super().__init__()
-        self.add_font("DejaVu", "", FONT_PATH, uni=True)
+        self.add_font("DejaVu", "", FONT_PATH_REGULAR, uni=True)
+        self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
         self.set_font("DejaVu", "", 12)
 
     def header(self):
