@@ -11,11 +11,11 @@ def get_gsheet_client():
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     return gspread.authorize(creds)
 
-# Lecture des données de l’onglet Interface
+# Lecture des données de l’onglet Interface (headers en ligne 5)
 def get_sheet_data():
     client = get_gsheet_client()
     sheet = client.open_by_key(os.getenv("GOOGLE_SHEET_ID"))
-    interface = sheet.worksheet("Interface").get_all_records()
+    interface = sheet.worksheet("Interface").get_all_records(head=5)  # 👈 Correction ici
     return interface
 
 # Dictionnaire des propriétaires depuis l’onglet DB
