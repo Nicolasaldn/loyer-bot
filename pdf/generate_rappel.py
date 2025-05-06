@@ -3,12 +3,14 @@ import os
 
 FONT_PATH_REGULAR = "pdf/DejaVuSans.ttf"
 FONT_PATH_BOLD = "pdf/DejaVuSans-Bold.ttf"
+FONT_PATH_ITALIC = "pdf/DejaVuSans-Oblique.ttf"
 
 class RappelPDF(FPDF):
     def __init__(self):
         super().__init__()
         self.add_font("DejaVu", "", FONT_PATH_REGULAR, uni=True)
         self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
+        self.add_font("DejaVu", "I", FONT_PATH_ITALIC, uni=True)
         self.set_font("DejaVu", "", 12)
 
     def header(self):
