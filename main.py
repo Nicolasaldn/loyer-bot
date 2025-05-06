@@ -1,56 +1,32 @@
 import os
 import json
 import re
-import requests
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from fpdf import FPDF
+from telegram import Update, InputFile
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # === Configuration ===
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 SHEET_NAME = "RE - Gestion"
 raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
-BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# === Fonction d'envoi Telegram ===
-def send_message(text):
-    requests.post(f"{BASE_URL}/sendMessage", data={"chat_id": CHAT_ID, "text": text})
-
-def send_document(file_path):
-    with open(file_path, "rb") as f:
-        requests.post(f"{BASE_URL}/sendDocument", data={"chat_id": CHAT_ID}, files={"document": f})
-
-# === Fonction de parsing du message ===
-def process_message(text):
-    text = text.strip().lower()
-    match_all = re.match(r"rappels\s+(\d{2}/\d{2}/\d{4})", text)
-    if match_all:
-        try:
-            return {"type": "all", "date": datetime.strptime(match_all.group(1), "%d/%m/%Y")}
-        except:
-            return {"error": "Date invalide"}
-
-    match_one = re.match(r"rappel\s+(.+?)\s+(\d{2}/\d{2}/\d{4})", text)
-    if match_one:
-        try:
-            return {
-                "type": "single",
-                "nom": match_one.group(1).strip().title(),
-                "date": datetime.strptime(match_one.group(2), "%d/%m/%Y")
-            }
-        except:
-            return {"error": "Date invalide"}
-
-    return {"error": "Commande non reconnue"}
+# === Connexion Google Sheets ===
+creds_dict = json.loads(raw_creds)
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+spreadsheet = client.open(SHEET_NAME)
+sheet_interface = spreadsheet.worksheet("Interface")
+sheet_db = spreadsheet.worksheet("DB")
 
 # === Classe PDF ===
 class AvisLoyerPDF(FPDF):
     def header(self):
         self.set_font("Arial", "B", 16)
         self.cell(0, 10, "AVIS D'ÉCHÉANCE", ln=1, align="C")
-        self.set_font("Arial", "", 12)
 
     def generate(self, locataire, proprio_nom, proprio_adresse, date_rappel: datetime, frequence: str):
         nb_mois = 3 if frequence.lower().startswith("tri") else 1
@@ -106,81 +82,71 @@ class AvisLoyerPDF(FPDF):
         self.multi_cell(0, 6, "Cet avis est une demande de paiement. Il ne peut en aucun cas servir de reçu ou de quittance de loyer.")
         return self
 
-# === Connexion Google Sheets ===
-creds_dict = json.loads(raw_creds)
-scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-spreadsheet = client.open(SHEET_NAME)
-sheet_interface = spreadsheet.worksheet("Interface")
-sheet_db = spreadsheet.worksheet("DB")
+# === Commande reçue ===
+def parse_command(text):
+    match_all = re.match(r"rappels\s+(\d{2}/\d{2}/\d{4})", text.lower())
+    if match_all:
+        return {"type": "all", "date": datetime.strptime(match_all.group(1), "%d/%m/%Y")}
+    match_one = re.match(r"rappel\s+(.+?)\s+(\d{2}/\d{2}/\d{4})", text.lower())
+    if match_one:
+        return {
+            "type": "single",
+            "nom": match_one.group(1).strip().title(),
+            "date": datetime.strptime(match_one.group(2), "%d/%m/%Y")
+        }
+    return {"error": "Commande non reconnue."}
 
-# === Traitement du dernier message non traité ===
-updates = requests.get(f"{BASE_URL}/getUpdates").json()
-messages = sorted(updates.get("result", []), key=lambda x: x["update_id"])
-
-if messages:
-    last_msg = messages[-1]
-    update_id = last_msg["update_id"]
-
-    # Vérifie si ce message a déjà été traité
-    last_id_path = "/tmp/last_update_id.txt"
-    if os.path.exists(last_id_path):
-        with open(last_id_path, "r") as f:
-            last_seen = int(f.read().strip())
-        if update_id <= last_seen:
-            exit()  # déjà traité, on quitte
-
-    # Enregistre l'ID actuel comme le dernier traité
-    with open(last_id_path, "w") as f:
-        f.write(str(update_id))
-
-    text = last_msg["message"].get("text", "")
-    command = process_message(text)
+# === Handler principal ===
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    chat_id = update.message.chat_id
+    command = parse_command(text)
 
     if "error" in command:
-        send_message("⛔ " + command["error"])
+        await context.bot.send_message(chat_id=chat_id, text="⛔ " + command["error"])
+        return
 
-    elif command["type"] == "all":
-        send_message(f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')} en cours…")
-        data = sheet_interface.get_all_values()[5:]
-        db_data = sheet_db.get_all_values()[1:]
-        db_dict = {row[0]: row[1] for row in db_data}
+    db_data = sheet_db.get_all_values()[1:]
+    db_dict = {row[0]: row[1] for row in db_data}
+    data = sheet_interface.get_all_values()[5:]
+
+    if command["type"] == "all":
+        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération des rappels pour {command['date'].strftime('%d/%m/%Y')}...")
         for row in data:
             if len(row) >= 7 and row[6].strip().lower() == 'true':
-                locataire = {
-                    "nom": row[0].strip().title(),
-                    "adresse": row[2].strip(),
-                    "loyer": float(row[3]),
-                }
-                proprio = row[5].strip()
-                proprio_adresse = db_dict.get(proprio, "")
-                frequence = row[4].strip()
-                pdf = AvisLoyerPDF()
-                pdf.add_page()
-                pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
-                filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
-                pdf.output(filename)
-                send_document(filename)
+                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
 
     elif command["type"] == "single":
-        send_message(f"📄 Génération du rappel pour {command['nom']} en cours…")
-        data = sheet_interface.get_all_values()[5:]
-        db_data = sheet_db.get_all_values()[1:]
-        db_dict = {row[0]: row[1] for row in db_data}
+        await context.bot.send_message(chat_id=chat_id, text=f"📄 Génération du rappel pour {command['nom']}...")
         for row in data:
             if row[0].strip().lower() == command['nom'].lower() and row[6].strip().lower() == 'true':
-                locataire = {
-                    "nom": row[0].strip().title(),
-                    "adresse": row[2].strip(),
-                    "loyer": float(row[3]),
-                }
-                proprio = row[5].strip()
-                proprio_adresse = db_dict.get(proprio, "")
-                frequence = row[4].strip()
-                pdf = AvisLoyerPDF()
-                pdf.add_page()
-                pdf.generate(locataire, proprio, proprio_adresse, command['date'], frequence)
-                filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{command['date'].strftime('%Y-%m-%d')}.pdf"
-                pdf.output(filename)
-                send_document(filename)
+                await generate_and_send_pdf(row, db_dict, command['date'], context, chat_id)
+                return
+        await context.bot.send_message(chat_id=chat_id, text="❌ Locataire introuvable ou non à relancer.")
+
+# === Génération PDF ===
+async def generate_and_send_pdf(row, db_dict, date_rappel, context, chat_id):
+    locataire = {
+        "nom": row[0].strip().title(),
+        "adresse": row[2].strip(),
+        "loyer": float(row[3])
+    }
+    proprio = row[5].strip()
+    proprio_adresse = db_dict.get(proprio, "")
+    frequence = row[4].strip()
+
+    pdf = AvisLoyerPDF()
+    pdf.add_page()
+    pdf.generate(locataire, proprio, proprio_adresse, date_rappel, frequence)
+    filename = f"/tmp/Avis_{locataire['nom'].replace(' ', '_')}_{date_rappel.strftime('%Y-%m-%d')}.pdf"
+    pdf.output(filename)
+
+    with open(filename, "rb") as f:
+        await context.bot.send_document(chat_id=chat_id, document=InputFile(f), filename=os.path.basename(filename))
+
+# === Lancement du bot ===
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    print("🤖 Bot prêt à recevoir des messages…")
+    app.run_polling()
