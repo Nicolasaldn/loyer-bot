@@ -6,15 +6,14 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from fpdf import FPDF
 from telegram import Update, InputFile, Bot
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, Application, MessageHandler, filters
 from fastapi import FastAPI, Request
 from telegram.constants import ParseMode
-from telegram.ext import Application, MessageHandler, filters
 import uvicorn
 
 # === Configuration ===
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Ex: https://loyer-bot.onrender.com/webhook
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Ex: https://loyer-bot.onrender.com
 SHEET_NAME = "RE - Gestion"
 raw_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
 
@@ -155,8 +154,8 @@ telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_
 
 @app.on_event("startup")
 async def startup():
-    bot = Bot(BOT_TOKEN)
-    await bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+    await telegram_app.initialize()
+    await telegram_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
 
 @app.post("/webhook")
 async def webhook(request: Request):
@@ -165,6 +164,6 @@ async def webhook(request: Request):
     await telegram_app.process_update(update)
     return {"status": "ok"}
 
-# === Local run (utile si testé en local avec ngrok) ===
+# === Local run ===
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
