@@ -10,6 +10,12 @@ from handlers.message_handler import handle_message
 from handlers.quittance_handler import (
     handle_quittance_command,
     handle_quittance_selection,
+    handle_quittance_period,
+)
+from handlers.rappel_handler import (
+    handle_rappel_command,
+    handle_rappel_selection,
+    handle_rappel_date
 )
 
 # === Initialisation FastAPI ===
@@ -26,7 +32,17 @@ dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("quittance", handle_quittance_command))
+dispatcher.add_handler(CommandHandler("rappel", handle_rappel_command))
+
+# === Gestion des callbacks pour les boutons ===
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
+dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
+
+# === Gestion des messages directs pour les dates ===
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_rappel_date))
+
+# === Fallback pour les messages non reconnus ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram ===
