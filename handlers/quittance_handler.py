@@ -3,7 +3,6 @@ from telegram.ext import CallbackContext
 from utils.sheets import list_tenants
 from utils.state import set_user_state, clear_user_state, get_user_state
 from pdf.generate_quittance import generate_quittance_pdf
-from datetime import datetime
 import os
 
 def handle_quittance_command(update: Update, context: CallbackContext):
@@ -35,11 +34,9 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
 
     context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Parfait, tu veux une quittance pour {locataire}.\n"
-             "Pour quelle période ?\n"
-             "Tu peux m’écrire par exemple :\n→ janvier 2024\n→ de janvier 2024 à mars 2024"
+        text=f"Parfait, tu veux générer une quittance pour {locataire}.\n"
+             "Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
     )
-
 
 def handle_quittance_period(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -47,12 +44,22 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 
     if state.get("action") == "quittance" and state.get("name"):
         locataire = state["name"]
-        date_text = update.message.text.strip()
+        period = update.message.text.strip()
 
-        # Génération du PDF de quittance
-        filepath = generate_quittance_pdf(locataire, date_text)
-        context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
-        os.remove(filepath)
+        try:
+            filepath = generate_quittance_pdf(locataire, period)
+            context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
+            os.remove(filepath)
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ Quittance pour {locataire} générée avec succès pour la période {period}."
+            )
+        except Exception as e:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"❌ Erreur lors de la génération de la quittance : {str(e)}"
+            )
+
         clear_user_state(user_id)
     else:
         context.bot.send_message(
