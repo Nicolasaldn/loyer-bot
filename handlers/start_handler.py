@@ -11,11 +11,11 @@ def start(update: Update, context: CallbackContext):
     for t in tenants:
         message += f"• {t}\n"
     
-    # Menu avec les options disponibles
+    # Menu avec les options disponibles sous forme de boutons
     keyboard = [
         ["/rappel", "/quittance"]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
     # Envoi du message avec les options
     context.bot.send_message(
