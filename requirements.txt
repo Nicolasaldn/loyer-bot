@@ -7,3 +7,4 @@ fpdf2
 chatterbot==1.0.5
 chatterbot-corpus==1.2.0
 nltk
+setuptools==58.0.4  # Ajout pour éviter le problème de distutils
