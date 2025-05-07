@@ -30,7 +30,7 @@ def handle_rappel_selection(update: Update, context: CallbackContext):
     locataire = data.split(":", 1)[1].strip()
     user_id = update.effective_user.id
 
-    # Stocker le nom du locataire sélectionné dans l'état utilisateur
+    # ✅ Stocker l'état utilisateur pour continuer le flow
     set_user_state(user_id, {"action": "rappel", "name": locataire})
 
     context.bot.send_message(
