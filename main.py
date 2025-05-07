@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
 import os
 import json
 
@@ -29,12 +29,20 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # ex: https://loyer-bot.onrender.com
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
+# === Debug: Afficher tous les updates reçus ===
+def debug_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+    print(f"DEBUG CALLBACK -> {query.data}")
+    query.edit_message_text(f"DEBUG: Callback reçu -> {query.data}")
+
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("quittance", handle_quittance_command))
 dispatcher.add_handler(CommandHandler("rappel", handle_rappel_command))
 
-# === Gestion des callbacks pour les boutons ===
+# === Gestion des callbacks pour les boutons avec Debug ===
+dispatcher.add_handler(CallbackQueryHandler(debug_callback))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
 
@@ -45,11 +53,14 @@ dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_ra
 # === Fallback pour les messages non reconnus ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
-# === Route webhook Telegram ===
+# === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
 async def webhook(req: Request):
     try:
         data = await req.json()
+        print("==== Requête reçue ====")
+        print(json.dumps(data, indent=4))
+        
         update = Update.de_json(data, bot)
         dispatcher.process_update(update)
     except Exception as e:
@@ -61,10 +72,11 @@ async def webhook(req: Request):
 async def root():
     return {"message": "Bot opérationnel ✅"}
 
-# === Enregistrement webhook à chaque startup ===
+# === Enregistrement webhook à chaque startup avec Debug ===
 @app.on_event("startup")
 async def set_webhook():
     webhook_url = f"{WEBHOOK_URL}/webhook"
     bot.delete_webhook()
-    bot.set_webhook(url=webhook_url)
+    response = bot.set_webhook(url=webhook_url)
     print(f"Webhook défini : {webhook_url}")
+    print(f"Réponse Webhook : {response}")
