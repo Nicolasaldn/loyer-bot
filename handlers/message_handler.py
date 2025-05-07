@@ -26,6 +26,7 @@ def handle_message(update: Update, context: CallbackContext):
         clear_user_state(user_id)
         filepath = generate_rappel_pdf(name, date_str)
         context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
+        os.remove(filepath)  # Supprimer après envoi
         return
 
     if "rappel" in message_text:
@@ -49,6 +50,7 @@ def handle_message(update: Update, context: CallbackContext):
         clear_user_state(user_id)
         filepath = generate_rappel_pdf(name, date_str)
         context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
+        os.remove(filepath)  # Supprimer après envoi
         return
 
     # === QUITTANCE ===
@@ -70,13 +72,17 @@ def handle_message(update: Update, context: CallbackContext):
             date_obj = datetime.strptime(date_debut, "%d/%m/%Y")
             filepath = generate_quittance_pdf(nom, date_obj)
             context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
+            os.remove(filepath)  # Supprimer après envoi
         else:
+            # Plusieurs mois : génération des PDF et création du ZIP
             fichiers = generate_quittances_pdf(nom, date_debut, date_fin)
             zip_path = "pdf/generated/quittances.zip"
             with zipfile.ZipFile(zip_path, "w") as zipf:
                 for f in fichiers:
                     zipf.write(f, os.path.basename(f))
+                    os.remove(f)  # Supprimer chaque PDF après ajout au ZIP
             context.bot.send_document(chat_id=update.effective_chat.id, document=open(zip_path, "rb"))
+            os.remove(zip_path)  # Supprimer le ZIP après envoi
         return
 
     # === Fallback ===
