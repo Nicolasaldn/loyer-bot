@@ -24,15 +24,18 @@ def handle_quittance_command(update: Update, context: CallbackContext):
 
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
-    query.answer()
+    query.answer()  # ✅ Répond immédiatement pour éviter l'erreur de délai
 
     tenant_name = query.data.split(":", 1)[1].strip()
     context.user_data['quittance_tenant'] = tenant_name
 
-    query.edit_message_text(
-        f"Parfait, tu veux générer une quittance pour {tenant_name}.\n"
-        "Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
-    )
+    # ✅ Vérifie si le texte doit vraiment être modifié
+    new_text = f"Parfait, tu veux générer une quittance pour {tenant_name}.\n" \
+               "Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+    
+    if query.message.text != new_text:
+        query.edit_message_text(new_text)
+    
     print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
     return ENTER_PERIOD
 
@@ -88,30 +91,4 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 # ✅ Génération de plusieurs quittances (PDFs dans un ZIP)
 def generate_multiple_quittances(tenant_name, start_month, end_month):
     print(f"✅ [DEBUG] Génération de quittances de {start_month} à {end_month} pour {tenant_name}")
-    from pdf.generate_quittance import generate_quittance_pdf
-    months = ["janvier", "février", "mars", "avril", "mai", "juin",
-              "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
-    
-    start_index = months.index(start_month.lower())
-    end_index = months.index(end_month.lower()) + 1
-
-    filepaths = []
-
-    for month in months[start_index:end_index]:
-        filepath = f"pdf/{tenant_name}_quittance_{month}.pdf"
-        generate_quittance_pdf(tenant_name, month, filepath)
-        filepaths.append(filepath)
-        print(f"✅ [DEBUG] Quittance générée : {filepath}")
-
-    return filepaths
-
-# ✅ Création d'un fichier ZIP avec les quittances multiples
-def create_zip_from_pdfs(filepaths, tenant_name, period):
-    zip_filename = f"pdf/{tenant_name}_quittances_{period.replace(' ', '_')}.zip"
-    with zipfile.ZipFile(zip_filename, 'w') as zipf:
-        for filepath in filepaths:
-            zipf.write(filepath, os.path.basename(filepath))
-            print(f"✅ [DEBUG] Fichier ajouté au ZIP : {filepath}")
-
-    print(f"✅ [DEBUG] ZIP créé : {zip_filename}")
-    return zip_filename
+    from
