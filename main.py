@@ -29,26 +29,18 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # ex: https://loyer-bot.onrender.com
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
-# === Debug: Afficher tous les updates reçus ===
-def debug_callback(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-    print(f"DEBUG CALLBACK -> {query.data}")
-    query.edit_message_text(f"DEBUG: Callback reçu -> {query.data}")
-
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("quittance", handle_quittance_command))
 dispatcher.add_handler(CommandHandler("rappel", handle_rappel_command))
 
-# === Gestion des callbacks pour les boutons avec Debug ===
-dispatcher.add_handler(CallbackQueryHandler(debug_callback))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
+# === Gestion des callbacks pour les boutons ===
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
 
-# === Gestion des messages directs pour les dates ===
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
+# === Gestion des messages directs pour les dates (ordre critique) ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_rappel_date))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
 
 # === Fallback pour les messages non reconnus ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
