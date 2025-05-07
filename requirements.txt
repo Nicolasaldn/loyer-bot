@@ -5,7 +5,3 @@ gspread
 oauth2client
 fpdf2
 nltk
-chatterbot==1.0.5
-chatterbot-corpus==1.2.0
-setuptools==58.0.4
-wheel
