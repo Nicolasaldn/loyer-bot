@@ -1,4 +1,4 @@
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import CallbackContext
 from utils.sheets import list_tenants
 
@@ -11,13 +11,14 @@ def start(update: Update, context: CallbackContext):
     for t in tenants:
         message += f"• {t}\n"
     
-    # Menu avec les options disponibles sous forme de boutons
+    # Création des boutons inline (cliquables)
     keyboard = [
-        ["/rappel", "/quittance"]
+        [InlineKeyboardButton("📄 Envoyer un Rappel", callback_data="/rappel")],
+        [InlineKeyboardButton("📃 Générer une Quittance", callback_data="/quittance")]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Envoi du message avec les options
+    # Envoi du message avec les boutons inline
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=message + "\nChoisis une option ci-dessous :",
