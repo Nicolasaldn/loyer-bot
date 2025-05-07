@@ -14,7 +14,7 @@ from datetime import datetime
 import os
 import zipfile
 
-# Import du chatbot
+# Import du chatbot simplifié
 from chatbot import get_chatbot_response
 
 def handle_message(update: Update, context: CallbackContext):
@@ -32,14 +32,6 @@ def handle_message(update: Update, context: CallbackContext):
             os.remove(filepath)
             return
 
-        if name and not date_str:
-            update_user_state(user_id, "name", name)
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Parfait, tu veux faire un rappel pour {name.title()}. Donne-moi maintenant la date (JJ/MM/AAAA)."
-            )
-            return
-
     if "rappel" in message_text:
         set_user_state(user_id, {"action": "rappel"})
         context.bot.send_message(
@@ -49,13 +41,12 @@ def handle_message(update: Update, context: CallbackContext):
         return
 
     # === QUITTANCE ===
-    if state.get("action") == "quittance" and state.get("name"):
+    if state.get("action") == "quittance":
         try:
             date_debut, date_fin = parse_quittance_period(message_text)
             clear_user_state(user_id)
             if date_debut == date_fin:
-                date_obj = datetime.strptime(date_debut, "%d/%m/%Y")
-                filepath = generate_quittance_pdf(state["name"], date_obj)
+                filepath = generate_quittance_pdf(state["name"], datetime.strptime(date_debut, "%d/%m/%Y"))
                 context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
                 os.remove(filepath)
             else:
@@ -64,7 +55,7 @@ def handle_message(update: Update, context: CallbackContext):
                 with zipfile.ZipFile(zip_path, "w") as zipf:
                     for f in fichiers:
                         zipf.write(f, os.path.basename(f))
-                        os.remove(f)
+                    os.remove(f)
                 context.bot.send_document(chat_id=update.effective_chat.id, document=open(zip_path, "rb"))
                 os.remove(zip_path)
             return
