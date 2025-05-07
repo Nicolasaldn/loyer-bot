@@ -30,14 +30,14 @@ def handle_rappel_selection(update: Update, context: CallbackContext):
     locataire = data.split(":", 1)[1].strip()
     user_id = update.effective_user.id
 
+    # Stocker le nom du locataire sélectionné dans l'état utilisateur
     set_user_state(user_id, {"action": "rappel", "name": locataire})
 
     context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Parfait, tu veux un rappel pour {locataire}.\n"
+        text=f"Parfait, tu veux faire un rappel pour {locataire}.\n"
              "Indique la date souhaitée (JJ/MM/AAAA)."
     )
-
 
 def handle_rappel_date(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -48,9 +48,20 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         date_text = update.message.text.strip()
 
         # Génération du PDF de rappel
-        filepath = generate_rappel_pdf(locataire, date_text)
-        context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
-        os.remove(filepath)
+        try:
+            filepath = generate_rappel_pdf(locataire, date_text)
+            context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
+            os.remove(filepath)
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"✅ Rappel pour {locataire} généré avec succès pour la date {date_text}."
+            )
+        except Exception as e:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"❌ Erreur lors de la génération du rappel : {str(e)}"
+            )
+
         clear_user_state(user_id)
     else:
         context.bot.send_message(
