@@ -47,7 +47,6 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         locataire = state["name"]
         date_text = update.message.text.strip()
 
-        # Génération du PDF de rappel
         try:
             filepath = generate_rappel_pdf(locataire, date_text)
             context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
