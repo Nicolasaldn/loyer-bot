@@ -35,8 +35,9 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         print("❌ [DEBUG] Erreur : Nom de locataire introuvable dans le callback data.")
         return ConversationHandler.END
 
+    # ✅ Stockage correct dans context.user_data
     context.user_data['quittance_tenant'] = tenant_name
-    print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
+    print(f"✅ [DEBUG] Locataire sélectionné stocké : {tenant_name}")
 
     query.edit_message_text(
         f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
@@ -45,13 +46,15 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
 
 def handle_quittance_period(update: Update, context: CallbackContext):
     tenant_name = context.user_data.get('quittance_tenant')
-    period = update.message.text.strip()
-    print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
+    print(f"✅ [DEBUG] Locataire récupéré pour la quittance : {tenant_name}")
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
         print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
+
+    period = update.message.text.strip()
+    print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
 
     if not period:
         update.message.reply_text("❌ Erreur : aucune période fournie.")
