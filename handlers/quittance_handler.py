@@ -1,5 +1,7 @@
+# quittance_handler.py
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackContext, ConversationHandler, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
+from telegram.ext import CallbackContext, ConversationHandler
 from pdf.generate_quittance import generate_quittance_pdf
 import os
 import zipfile
@@ -24,19 +26,21 @@ def handle_quittance_command(update: Update, context: CallbackContext):
 
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
-    query.answer()  # ✅ Répond immédiatement pour éviter l'erreur de délai
+    query.answer()
 
-    tenant_name = query.data.split(":", 1)[1].strip()
+    try:
+        tenant_name = query.data.split(":", 1)[1].strip()
+    except IndexError:
+        query.edit_message_text("❌ Erreur : Le locataire sélectionné est invalide.")
+        print("❌ [DEBUG] Erreur : Nom de locataire introuvable dans le callback data.")
+        return ConversationHandler.END
+
     context.user_data['quittance_tenant'] = tenant_name
-
-    # ✅ Vérifie si le texte doit vraiment être modifié
-    new_text = f"Parfait, tu veux générer une quittance pour {tenant_name}.\n" \
-               "Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
-    
-    if query.message.text != new_text:
-        query.edit_message_text(new_text)
-    
     print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
+
+    query.edit_message_text(
+        f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+    )
     return ENTER_PERIOD
 
 def handle_quittance_period(update: Update, context: CallbackContext):
@@ -46,10 +50,12 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
+        print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
 
     if not period:
         update.message.reply_text("❌ Erreur : aucune période fournie.")
+        print("❌ [DEBUG] Période non fournie.")
         return ENTER_PERIOD
 
     try:
@@ -61,6 +67,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 
             with open(zip_path, "rb") as zip_file:
                 update.message.reply_document(document=zip_file)
+                print(f"✅ [DEBUG] Fichier ZIP envoyé : {zip_path}")
             
             # ✅ Suppression des fichiers temporaires
             for path in filepaths:
@@ -68,8 +75,8 @@ def handle_quittance_period(update: Update, context: CallbackContext):
                     os.remove(path)
             if os.path.exists(zip_path):
                 os.remove(zip_path)
-            
-            print(f"✅ [DEBUG] Fichier ZIP envoyé : {zip_path}")
+                print(f"✅ [DEBUG] Fichier ZIP supprimé : {zip_path}")
+
         else:
             print("✅ [DEBUG] Génération d'une quittance simple.")
             pdf_path = f"pdf/{tenant_name}_quittance_{period.replace('/', '-')}.pdf"
@@ -77,10 +84,11 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
+                print(f"✅ [DEBUG] PDF simple envoyé : {pdf_path}")
             
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
-            print(f"✅ [DEBUG] PDF simple envoyé : {pdf_path}")
+                print(f"✅ [DEBUG] PDF supprimé : {pdf_path}")
 
         update.message.reply_text(
             f"✅ Quittance pour {tenant_name} générée avec succès pour la période {period}."
@@ -95,7 +103,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 # ✅ Génération de plusieurs quittances (PDFs dans un ZIP)
 def generate_multiple_quittances(tenant_name, start_month, end_month):
     print(f"✅ [DEBUG] Génération de quittances de {start_month} à {end_month} pour {tenant_name}")
-    from pdf.generate_quittance import generate_quittance_pdf
+    
     months = [
         "janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"
@@ -107,10 +115,10 @@ def generate_multiple_quittances(tenant_name, start_month, end_month):
     filepaths = []
 
     for month in months[start_index:end_index]:
-        filepath = f"pdf/{tenant_name}_quittance_{month}.pdf"
-        generate_quittance_pdf(tenant_name, month, filepath)
-        filepaths.append(filepath)
-        print(f"✅ [DEBUG] Quittance générée : {filepath}")
+        pdf_path = f"pdf/{tenant_name}_quittance_{month}.pdf"
+        generate_quittance_pdf(tenant_name, month, pdf_path)
+        filepaths.append(pdf_path)
+        print(f"✅ [DEBUG] Quittance générée : {pdf_path}")
 
     return filepaths
 
