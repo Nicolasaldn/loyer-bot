@@ -26,7 +26,7 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
     try:
         tenant_name = query.data.split(":", 1)[1].strip()
         context.user_data['quittance_tenant'] = tenant_name
-        print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
+        print(f"✅ [DEBUG] Locataire sélectionné et enregistré : {tenant_name}")
 
         query.edit_message_text(
             f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
@@ -41,26 +41,34 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
 def handle_quittance_period(update: Update, context: CallbackContext):
     tenant_name = context.user_data.get('quittance_tenant')
     period = update.message.text.strip()
+    print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
 
     if not tenant_name:
-        update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
+        update.message.reply_text("❌ Erreur : aucun locataire sélectionné. Utilise /quittance pour recommencer.")
+        print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
 
     if not period:
         update.message.reply_text("❌ Erreur : aucune période fournie.")
+        print("❌ [DEBUG] Période non fournie.")
         return ENTER_PERIOD
 
     try:
         if "à" in period:
             start_month, end_month = map(str.strip, period.split("à"))
+            print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name} de {start_month} à {end_month}.")
             filepaths = generate_quittances_pdf(tenant_name, start_month, end_month)
+
             zip_path = create_zip_from_pdfs(filepaths, tenant_name, period)
+            print(f"✅ [DEBUG] Fichier ZIP généré : {zip_path}")
 
             with open(zip_path, "rb") as zip_file:
                 update.message.reply_document(document=zip_file)
 
         else:
+            print(f"✅ [DEBUG] Génération d'une quittance simple pour {tenant_name}.")
             pdf_path = generate_quittance_pdf(tenant_name, period)
+            print(f"✅ [DEBUG] PDF généré : {pdf_path}")
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
 
