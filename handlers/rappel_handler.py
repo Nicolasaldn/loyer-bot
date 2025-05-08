@@ -2,8 +2,14 @@
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
-from pdf.generate_rappel import generate_rappel_pdf
 import os
+
+# ✅ Import sécurisé de la fonction generate_rappel_pdf
+try:
+    from pdf.generate_rappel import generate_rappel_pdf
+except ImportError:
+    print("❌ [DEBUG] Erreur : La fonction generate_rappel_pdf n'a pas été trouvée.")
+    generate_rappel_pdf = None
 
 # ✅ Définition des états pour le ConversationHandler
 SELECT_TENANT, ENTER_DATE = range(2)
@@ -20,6 +26,7 @@ def handle_rappel_command(update: Update, context: CallbackContext):
         text="Quel locataire pour le rappel ?",
         reply_markup=reply_markup
     )
+    print("✅ [DEBUG] Commande rappel déclenchée.")
     return SELECT_TENANT
 
 def handle_rappel_selection(update: Update, context: CallbackContext):
@@ -32,11 +39,13 @@ def handle_rappel_selection(update: Update, context: CallbackContext):
     query.edit_message_text(
         f"Parfait, tu veux faire un rappel pour {tenant_name}.\nIndique la date souhaitée (JJ/MM/AAAA)."
     )
+    print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
     return ENTER_DATE
 
 def handle_rappel_date(update: Update, context: CallbackContext):
     tenant_name = context.user_data.get('rappel_tenant')
     date = update.message.text.strip()
+    print(f"✅ [DEBUG] Date reçue : {date} pour {tenant_name}")
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
@@ -46,17 +55,26 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Erreur : aucune date fournie.")
         return ENTER_DATE
 
+    if not generate_rappel_pdf:
+        update.message.reply_text("❌ Erreur : La fonction de génération de rappel n'est pas disponible.")
+        print("❌ [DEBUG] La fonction generate_rappel_pdf n'est pas définie.")
+        return ConversationHandler.END
+
     try:
         # ✅ Génération du PDF
         pdf_path = f"pdf/{tenant_name}_rappel_{date.replace('/', '-')}.pdf"
+        print(f"✅ [DEBUG] Génération du PDF : {pdf_path}")
         generate_rappel_pdf(tenant_name, date, 500, pdf_path)  # Montant par défaut
 
         # ✅ Envoi du PDF
         with open(pdf_path, "rb") as pdf_file:
             update.message.reply_document(document=pdf_file)
+            print(f"✅ [DEBUG] PDF envoyé : {pdf_path}")
         
         # ✅ Suppression du PDF après envoi
-        os.remove(pdf_path)
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+            print(f"✅ [DEBUG] PDF supprimé : {pdf_path}")
 
         update.message.reply_text(
             f"✅ Rappel pour {tenant_name} généré avec succès pour la date {date}."
@@ -64,5 +82,6 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
     except Exception as e:
+        print(f"❌ [DEBUG] Erreur lors de la génération du rappel : {str(e)}")
         update.message.reply_text(f"❌ Erreur lors de la génération du rappel : {str(e)}")
         return ConversationHandler.END
