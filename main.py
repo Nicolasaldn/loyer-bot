@@ -10,7 +10,7 @@ from handlers.message_handler import handle_message
 from handlers.rappel_handler import (
     handle_rappel_command,
     handle_rappel_selection,
-    handle_rappel_date  # ✅ Utilise la fonction de rappel_handler.py
+    handle_rappel_date
 )
 from handlers.quittance_handler import (
     handle_quittance_command,
@@ -70,12 +70,18 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
+
+# ✅ Gestion des rappels
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_rappel_date))
+
+# ✅ Gestion des quittances
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_rappel_date))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & ~Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_quittance_period))
+
+# ✅ Handler général pour les autres messages
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram avec Debug ===
