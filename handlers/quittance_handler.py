@@ -42,6 +42,9 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 def handle_quittance_period(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Entrée dans handle_quittance_period")
+    print(f"✅ [DEBUG] Context user_data : {context.user_data}")
+
     tenant_name = context.user_data.get('quittance_tenant')
     period = update.message.text.strip()
     print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
@@ -64,11 +67,15 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             start_month, end_month = map(str.strip, period.split("à"))
             print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name} de {start_month} à {end_month}.")
             filepaths = generate_quittances_pdf(tenant_name, start_month, end_month)
+            print(f"✅ [DEBUG] Fichiers générés : {filepaths}")
+
             zip_path = os.path.join(output_dir, f"Quittances_{tenant_name.replace(' ', '_')}.zip")
             with zipfile.ZipFile(zip_path, "w") as zipf:
                 for file in filepaths:
                     zipf.write(file, os.path.basename(file))
                     os.remove(file)
+            print(f"✅ [DEBUG] Zip généré : {zip_path}")
+
             with open(zip_path, "rb") as zip_file:
                 update.message.reply_document(document=zip_file)
             os.remove(zip_path)
@@ -76,6 +83,8 @@ def handle_quittance_period(update: Update, context: CallbackContext):
         else:
             print(f"✅ [DEBUG] Génération d'une quittance simple pour {tenant_name} pour la période {period}.")
             pdf_path = generate_quittance_pdf(tenant_name, period, output_dir=output_dir)
+            print(f"✅ [DEBUG] PDF généré : {pdf_path}")
+
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
             os.remove(pdf_path)
