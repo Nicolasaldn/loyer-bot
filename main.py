@@ -50,6 +50,25 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
+# === Gestion des rappels ===
+def handle_rappel_callback(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Commande /rappel déclenchée.")
+    query = update.callback_query
+    query.answer()
+
+    context.user_data.pop("quittance_tenant", None)
+
+    tenants = list_tenants()
+    keyboard = [
+        [InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    query.edit_message_text(
+        text="Quel locataire pour le rappel ?",
+        reply_markup=reply_markup
+    )
+
 # === Fonction de parsing des périodes de quittance ===
 def parse_quittance_period(period: str):
     period = period.lower().strip()
