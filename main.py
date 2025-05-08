@@ -104,32 +104,25 @@ def parse_quittance_period(period: str):
         raise ValueError("Format de période invalide.")
 
 # === Gestion des périodes et dates ===
-def handle_quittance_period(update: Update, context: CallbackContext):
-    tenant_name = context.user_data.get("quittance_tenant")
-    period = update.message.text.strip()
-
-    try:
-        start_date, end_date = parse_quittance_period(period)
-    except ValueError as e:
-        update.message.reply_text(f"❌ Erreur : {str(e)}")
+def handle_text_message(update: Update, context: CallbackContext):
+    if not update.message or not update.message.text:
         return
 
-    if start_date == end_date:
-        pdf_path = generate_quittance_pdf(tenant_name, start_date.strftime("%d/%m/%Y"))
-        update.message.reply_document(document=open(pdf_path, "rb"))
-        os.remove(pdf_path)
+    message_text = update.message.text.strip()
+
+    if "quittance_tenant" in context.user_data:
+        handle_quittance_period(update, context)
+    elif "rappel_tenant" in context.user_data:
+        handle_rappel_date(update, context)
     else:
-        pdf_files = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
-        for file in pdf_files:
-            update.message.reply_document(document=open(file, "rb"))
-            os.remove(file)
+        update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_message, pattern="^(rappel|quittance):"))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
 # === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
