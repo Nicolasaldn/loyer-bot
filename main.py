@@ -19,6 +19,8 @@ from handlers.quittance_handler import (
 )
 from utils.sheets import list_tenants
 from utils.state import set_user_state, get_user_state, clear_user_state
+from pdf.generate_quittance import generate_quittance_pdf
+from pdf.generate_rappel import generate_rappel_pdf
 
 # === Initialisation FastAPI ===
 app = FastAPI()
@@ -65,34 +67,47 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
-# === Ajout des handlers ===
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
-
-def handle_quittance_selection(update: Update, context: CallbackContext):
+def handle_rappel_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
     tenant_name = query.data.split(":", 1)[1]
-    context.user_data["quittance_tenant"] = tenant_name
+    context.user_data["rappel_tenant"] = tenant_name
 
     query.edit_message_text(
-        text=f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+        text=f"Parfait, tu veux faire un rappel pour {tenant_name}.\nIndique la date souhaitée (JJ/MM/AAAA)."
     )
 
-def handle_quittance_period(update: Update, context: CallbackContext):
-    tenant_name = context.user_data.get("quittance_tenant")
-    period = update.message.text.strip()
+def handle_rappel_date(update: Update, context: CallbackContext):
+    tenant_name = context.user_data.get("rappel_tenant")
+    date = update.message.text.strip()
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
         return
 
-    update.message.reply_text(f"✅ Génération de la quittance pour {tenant_name} pour la période {period}.")
+    try:
+        output_dir = "pdf/generated/"
+        os.makedirs(output_dir, exist_ok=True)
 
+        pdf_path = generate_rappel_pdf(tenant_name, date, output_dir=output_dir)
+        with open(pdf_path, "rb") as pdf_file:
+            update.message.reply_document(document=pdf_file)
+        os.remove(pdf_path)
+
+        update.message.reply_text(f"✅ Rappel pour {tenant_name} généré avec succès pour la date {date}.")
+
+    except Exception as e:
+        print(f"❌ [DEBUG] Erreur lors de la génération du rappel : {str(e)}")
+        update.message.reply_text(f"❌ Erreur lors de la génération du rappel : {str(e)}")
+
+# === Ajout des handlers ===
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:(.*)$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_rappel_date))
 
 # === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
