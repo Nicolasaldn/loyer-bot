@@ -71,7 +71,6 @@ dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/r
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & ~Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_quittance_period))
 
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -83,7 +82,17 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         text=f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
     )
 
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+def handle_quittance_period(update: Update, context: CallbackContext):
+    tenant_name = context.user_data.get("quittance_tenant")
+    period = update.message.text.strip()
+
+    if not tenant_name:
+        update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
+        return
+
+    update.message.reply_text(f"✅ Génération de la quittance pour {tenant_name} pour la période {period}.")
+
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
 
 # === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
