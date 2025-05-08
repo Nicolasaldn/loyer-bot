@@ -39,6 +39,8 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
 
+    context.user_data.pop("rappel_tenant", None)  # Efface le rappel
+
     tenants = list_tenants()
     keyboard = [
         [InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants
@@ -56,6 +58,8 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
 
+    context.user_data.pop("quittance_tenant", None)  # Efface la quittance
+
     tenants = list_tenants()
     keyboard = [
         [InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants
@@ -67,6 +71,7 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
+# === Sélection du locataire pour rappel ===
 def handle_rappel_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
@@ -77,28 +82,16 @@ def handle_rappel_selection(update: Update, context: CallbackContext):
         text=f"Parfait, tu veux faire un rappel pour {tenant_name}.\nIndique la date souhaitée (JJ/MM/AAAA)."
     )
 
-def handle_rappel_date(update: Update, context: CallbackContext):
-    tenant_name = context.user_data.get("rappel_tenant")
-    date = update.message.text.strip()
+# === Sélection du locataire pour quittance ===
+def handle_quittance_selection(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+    tenant_name = query.data.split(":", 1)[1]
+    context.user_data["quittance_tenant"] = tenant_name
 
-    if not tenant_name:
-        update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
-        return
-
-    try:
-        output_dir = "pdf/generated/"
-        os.makedirs(output_dir, exist_ok=True)
-
-        pdf_path = generate_rappel_pdf(tenant_name, date, output_dir=output_dir)
-        with open(pdf_path, "rb") as pdf_file:
-            update.message.reply_document(document=pdf_file)
-        os.remove(pdf_path)
-
-        update.message.reply_text(f"✅ Rappel pour {tenant_name} généré avec succès pour la date {date}.")
-
-    except Exception as e:
-        print(f"❌ [DEBUG] Erreur lors de la génération du rappel : {str(e)}")
-        update.message.reply_text(f"❌ Erreur lors de la génération du rappel : {str(e)}")
+    query.edit_message_text(
+        text=f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+    )
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
