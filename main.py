@@ -93,14 +93,22 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         text=f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
     )
 
+# === Gestion des périodes et dates ===
+def handle_text_message(update: Update, context: CallbackContext):
+    if "quittance_tenant" in context.user_data:
+        handle_quittance_period(update, context)
+    elif "rappel_tenant" in context.user_data:
+        handle_rappel_date(update, context)
+    else:
+        update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
+
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:(.*)$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_quittance_period))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_rappel_date))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
 # === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
