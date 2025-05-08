@@ -33,7 +33,7 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.set_font("DejaVu", "", 11)
     texte = (
         f"Je soussigné(e) {bailleur_nom} propriétaire du logement désigné ci-dessus, déclare avoir reçu "
-        f"de Mme {locataire_nom} la somme de {montant_loyer:.0f} euros ({montant_loyer:.0f} €), "
+        f"de {locataire_nom} la somme de {montant_loyer:.0f} euros ({montant_loyer:.0f} €), "
         f"au titre du paiement du loyer et des charges pour la période de location du {date_debut.strftime('%d/%m/%Y')} "
         f"au {date_fin.strftime('%d/%m/%Y')} et lui en donne quittance, sous réserve de tous mes droits."
     )
