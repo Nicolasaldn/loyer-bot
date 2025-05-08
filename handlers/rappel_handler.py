@@ -33,13 +33,19 @@ def handle_rappel_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
 
-    tenant_name = query.data.split(":", 1).strip()
+    try:
+        tenant_name = query.data.split(":", 1)[1].strip()
+    except IndexError:
+        print("❌ [DEBUG] Erreur : Nom de locataire introuvable dans le callback data.")
+        query.edit_message_text("❌ Erreur : Le locataire sélectionné est invalide.")
+        return ConversationHandler.END
+
     context.user_data['rappel_tenant'] = tenant_name
+    print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
 
     query.edit_message_text(
         f"Parfait, tu veux faire un rappel pour {tenant_name}.\nIndique la date souhaitée (JJ/MM/AAAA)."
     )
-    print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
     return ENTER_DATE
 
 def handle_rappel_date(update: Update, context: CallbackContext):
@@ -49,10 +55,12 @@ def handle_rappel_date(update: Update, context: CallbackContext):
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
+        print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
 
     if not date:
         update.message.reply_text("❌ Erreur : aucune date fournie.")
+        print("❌ [DEBUG] Date non fournie.")
         return ENTER_DATE
 
     if not generate_rappel_pdf:
@@ -66,24 +74,28 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         os.makedirs(output_dir, exist_ok=True)
         
         # ✅ Génération du PDF avec chemin sécurisé
-        pdf_path = os.path.join(output_dir, f"Avis_{tenant_name.replace(' ', '_')}_{date.replace('/', '-')}.pdf")
-        print(f"✅ [DEBUG] Génération du PDF à : {pdf_path}")
-        generate_rappel_pdf(tenant_name, date, output_dir=output_dir)
+        pdf_filename = f"Avis_{tenant_name.replace(' ', '_')}_{date.replace('/', '-')}.pdf"
+        pdf_path = os.path.join(output_dir, pdf_filename)
+        print(f"✅ [DEBUG] Chemin cible du PDF : {pdf_path}")
+
+        # ✅ Génération du PDF
+        generated_pdf_path = generate_rappel_pdf(tenant_name, date, output_dir=output_dir)
+        print(f"✅ [DEBUG] PDF généré à : {generated_pdf_path}")
 
         # ✅ Vérification de l'existence du PDF avant envoi
-        if not os.path.exists(pdf_path):
+        if not os.path.exists(generated_pdf_path):
             print(f"❌ [DEBUG] Le fichier PDF n'a pas été généré.")
             update.message.reply_text("❌ Erreur : Le PDF n'a pas pu être généré.")
             return ConversationHandler.END
 
         # ✅ Envoi du PDF
-        with open(pdf_path, "rb") as pdf_file:
+        with open(generated_pdf_path, "rb") as pdf_file:
             update.message.reply_document(document=pdf_file)
-            print(f"✅ [DEBUG] PDF envoyé : {pdf_path}")
+            print(f"✅ [DEBUG] PDF envoyé : {generated_pdf_path}")
         
         # ✅ Suppression du PDF après envoi
-        os.remove(pdf_path)
-        print(f"✅ [DEBUG] PDF supprimé : {pdf_path}")
+        os.remove(generated_pdf_path)
+        print(f"✅ [DEBUG] PDF supprimé : {generated_pdf_path}")
 
         update.message.reply_text(
             f"✅ Rappel pour {tenant_name} généré avec succès pour la date {date}."
