@@ -39,14 +39,19 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 def handle_quittance_period(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Début handle_quittance_period")
+    print(f"✅ [DEBUG] User Data Actuel : {context.user_data}")
+
     tenant_name = context.user_data.get('quittance_tenant')
-    period = update.message.text.strip()
-    print(f"✅ [DEBUG] Date reçue : {period} pour {tenant_name}")
+    print(f"✅ [DEBUG] Récupération du locataire : {tenant_name}")
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
         print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
+
+    period = update.message.text.strip()
+    print(f"✅ [DEBUG] Date reçue : {period} pour {tenant_name}")
 
     if not period:
         update.message.reply_text("❌ Erreur : aucune période fournie.")
