@@ -15,7 +15,8 @@ from handlers.rappel_handler import (
 )
 from handlers.quittance_handler import (
     handle_quittance_command,
-    handle_quittance_selection, handle_quittance_period
+    handle_quittance_selection,
+    handle_quittance_period
 )
 from utils.sheets import list_tenants
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
@@ -30,7 +31,26 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
-# === Gestion des périodes de quittance ===
+# === Gestion des callbacks ===
+def handle_quittance_callback(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Commande /quittance déclenchée.")
+    query = update.callback_query
+    query.answer()
+
+    context.user_data.pop("rappel_tenant", None)
+
+    tenants = list_tenants()
+    keyboard = [
+        [InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    query.edit_message_text(
+        text="Quel locataire pour la quittance ?",
+        reply_markup=reply_markup
+    )
+
+# === Fonction de parsing des périodes de quittance ===
 def parse_quittance_period(period: str):
     period = period.lower().strip()
 
@@ -45,13 +65,13 @@ def parse_quittance_period(period: str):
             months = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
                       "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12}
 
-            def month_to_date(month_str, year):
+            def month_to_date(month_str):
                 month = months.get(month_str.split()[0], 1)
                 year = int(month_str.split()[-1])
                 return datetime(year, month, 1)
 
-            start_date = month_to_date(start, start)
-            end_date = month_to_date(end, end)
+            start_date = month_to_date(start)
+            end_date = month_to_date(end)
 
         if start_date > end_date:
             raise ValueError("La date de début doit être avant la date de fin.")
@@ -88,7 +108,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
