@@ -3,6 +3,7 @@ from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
 import os
 import json
+from datetime import datetime
 
 # === Imports organisés ===
 from handlers.start_handler import start
@@ -14,100 +15,79 @@ from handlers.rappel_handler import (
 )
 from handlers.quittance_handler import (
     handle_quittance_command,
-    handle_quittance_selection,
-    handle_quittance_period
+    handle_quittance_selection, handle_quittance_period
 )
 from utils.sheets import list_tenants
-from utils.state import set_user_state, get_user_state, clear_user_state
-from pdf.generate_quittance import generate_quittance_pdf
+from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
 from pdf.generate_rappel import generate_rappel_pdf
 
 # === Initialisation FastAPI ===
 app = FastAPI()
 
-# === Variables d'environnement ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# === Initialisation bot Telegram ===
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
-# === Gestion des callbacks ===
-def handle_quittance_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /quittance déclenchée.")
-    query = update.callback_query
-    query.answer()
+# === Gestion des périodes de quittance ===
+def parse_quittance_period(period: str):
+    period = period.lower().strip()
 
-    context.user_data.pop("rappel_tenant", None)  # Efface le rappel
+    if "de" in period and "à" in period:
+        parts = period.replace("de ", "").split(" à ")
+        start, end = parts[0].strip(), parts[1].strip()
 
-    tenants = list_tenants()
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        try:
+            start_date = datetime.strptime(start, "%d/%m/%Y")
+            end_date = datetime.strptime(end, "%d/%m/%Y")
+        except ValueError:
+            months = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
+                      "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12}
 
-    query.edit_message_text(
-        text="Quel locataire pour la quittance ?",
-        reply_markup=reply_markup
-    )
+            def month_to_date(month_str, year):
+                month = months.get(month_str.split()[0], 1)
+                year = int(month_str.split()[-1])
+                return datetime(year, month, 1)
 
-# === Gestion des rappels ===
-def handle_rappel_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /rappel déclenchée.")
-    query = update.callback_query
-    query.answer()
+            start_date = month_to_date(start, start)
+            end_date = month_to_date(end, end)
 
-    context.user_data.pop("quittance_tenant", None)  # Efface la quittance
+        if start_date > end_date:
+            raise ValueError("La date de début doit être avant la date de fin.")
 
-    tenants = list_tenants()
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        return start_date, end_date
 
-    query.edit_message_text(
-        text="Quel locataire pour le rappel ?",
-        reply_markup=reply_markup
-    )
-
-# === Sélection du locataire pour rappel ===
-def handle_rappel_selection(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-    tenant_name = query.data.split(":", 1)[1]
-    context.user_data["rappel_tenant"] = tenant_name
-
-    query.edit_message_text(
-        text=f"Parfait, tu veux faire un rappel pour {tenant_name}.\nIndique la date souhaitée (JJ/MM/AAAA)."
-    )
-
-# === Sélection du locataire pour quittance ===
-def handle_quittance_selection(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-    tenant_name = query.data.split(":", 1)[1]
-    context.user_data["quittance_tenant"] = tenant_name
-
-    query.edit_message_text(
-        text=f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
-    )
+    try:
+        single_date = datetime.strptime(period, "%d/%m/%Y")
+        return single_date, single_date
+    except ValueError:
+        raise ValueError("Format de période invalide.")
 
 # === Gestion des périodes et dates ===
-def handle_text_message(update: Update, context: CallbackContext):
-    if "quittance_tenant" in context.user_data:
-        handle_quittance_period(update, context)
-    elif "rappel_tenant" in context.user_data:
-        handle_rappel_date(update, context)
+def handle_quittance_period(update: Update, context: CallbackContext):
+    tenant_name = context.user_data.get("quittance_tenant")
+    period = update.message.text.strip()
+
+    try:
+        start_date, end_date = parse_quittance_period(period)
+    except ValueError as e:
+        update.message.reply_text(f"❌ Erreur : {str(e)}")
+        return
+
+    if start_date == end_date:
+        pdf_path = generate_quittance_pdf(tenant_name, start_date.strftime("%d/%m/%Y"))
+        update.message.reply_document(document=open(pdf_path, "rb"))
+        os.remove(pdf_path)
     else:
-        update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
+        filepaths = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
+        update.message.reply_document(document=open(filepaths, "rb"))
+        os.remove(filepaths)
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:(.*)$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
 # === Route webhook Telegram avec Debug ===
@@ -115,12 +95,8 @@ dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_te
 async def webhook(req: Request):
     try:
         data = await req.json()
-        print("==== Requête reçue ====")
-        print(json.dumps(data, indent=4))
-
         update = Update.de_json(data, bot)
         dispatcher.process_update(update)
-        print("✅ [DEBUG] Mise à jour traitée par le dispatcher.")
     except Exception as e:
         print("❌ [DEBUG] Erreur webhook :", e)
     return {"ok": True}
@@ -134,5 +110,3 @@ async def set_webhook():
     webhook_url = f"{WEBHOOK_URL}/webhook"
     bot.delete_webhook()
     response = bot.set_webhook(url=webhook_url)
-    print(f"✅ [DEBUG] Webhook défini : {webhook_url}")
-    print(f"✅ [DEBUG] Réponse Webhook : {response}")
