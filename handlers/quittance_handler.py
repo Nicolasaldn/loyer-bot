@@ -54,6 +54,8 @@ def handle_quittance_period(update: Update, context: CallbackContext):
         return ENTER_PERIOD
 
     try:
+        print(f"✅ [DEBUG] Génération de quittance pour {tenant_name}.")
+
         if "à" in period:
             start_month, end_month = map(str.strip, period.split("à"))
             print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name}.")
@@ -72,6 +74,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
         else:
             print(f"✅ [DEBUG] Génération d'une quittance simple pour {tenant_name}.")
             pdf_path = generate_quittance_pdf(tenant_name, period)
+            print(f"✅ [DEBUG] PDF généré pour {tenant_name} à {pdf_path}")
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
             os.remove(pdf_path)
