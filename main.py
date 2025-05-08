@@ -69,40 +69,6 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
-# === Fonction de parsing des périodes de quittance ===
-def parse_quittance_period(period: str):
-    period = period.lower().strip()
-
-    if "de" in period and "à" in period:
-        parts = period.replace("de ", "").split(" à ")
-        start, end = parts[0].strip(), parts[1].strip()
-
-        try:
-            start_date = datetime.strptime(start, "%d/%m/%Y")
-            end_date = datetime.strptime(end, "%d/%m/%Y")
-        except ValueError:
-            months = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
-                      "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12}
-
-            def month_to_date(month_str):
-                month = months.get(month_str.split()[0], 1)
-                year = int(month_str.split()[-1])
-                return datetime(year, month, 1)
-
-            start_date = month_to_date(start)
-            end_date = month_to_date(end)
-
-        if start_date > end_date:
-            raise ValueError("La date de début doit être avant la date de fin.")
-
-        return start_date, end_date
-
-    try:
-        single_date = datetime.strptime(period, "%d/%m/%Y")
-        return single_date, single_date
-    except ValueError:
-        raise ValueError("Format de période invalide.")
-
 # === Gestion des périodes et dates ===
 def handle_text_message(update: Update, context: CallbackContext):
     if not update.message or not update.message.text:
@@ -120,8 +86,9 @@ def handle_text_message(update: Update, context: CallbackContext):
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:(.*)$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_message, pattern="^(rappel|quittance):"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
 # === Route webhook Telegram avec Debug ===
