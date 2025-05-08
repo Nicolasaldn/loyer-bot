@@ -73,6 +73,18 @@ dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & ~Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_quittance_period))
 
+# ✅ Correction : Stockage du locataire dans context.user_data
+@dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
+def handle_quittance_selection(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+    tenant_name = query.data.split(":", 1)[1]
+    context.user_data["quittance_tenant"] = tenant_name
+
+    query.edit_message_text(
+        text=f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+    )
+
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram avec Debug ===
