@@ -10,7 +10,7 @@ from handlers.message_handler import handle_message
 from handlers.rappel_handler import (
     handle_rappel_command,
     handle_rappel_selection,
-    handle_rappel_date
+    handle_rappel_date  # ✅ Utilise la fonction de rappel_handler.py
 )
 from handlers.quittance_handler import (
     handle_quittance_command,
@@ -33,6 +33,7 @@ dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
 # === Gestion des callbacks ===
 def handle_rappel_callback(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Commande /rappel déclenchée.")
     query = update.callback_query
     query.answer()
     
@@ -47,8 +48,10 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         text="Quel locataire pour le rappel ?",
         reply_markup=reply_markup
     )
+    print("✅ [DEBUG] Liste des locataires affichée.")
 
 def handle_quittance_callback(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Commande /quittance déclenchée.")
     query = update.callback_query
     query.answer()
     
@@ -63,43 +66,7 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
         text="Quel locataire pour la quittance ?",
         reply_markup=reply_markup
     )
-
-# === Gestion des actions de rappel ===
-def handle_rappel_selection(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-    locataire = query.data.split(":")[1]
-    set_user_state(update.effective_user.id, {"action": "rappel", "name": locataire})
-    
-    query.edit_message_text(
-        text=f"Parfait, tu veux faire un rappel pour {locataire}.\n"
-             "Indique la date souhaitée (JJ/MM/AAAA)."
-    )
-
-def handle_rappel_date(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    state = get_user_state(user_id)
-
-    if state.get("action") == "rappel" and state.get("name"):
-        locataire = state["name"]
-        date_text = update.message.text.strip()
-
-        try:
-            # Appelle ta fonction pour générer le PDF de rappel
-            filepath = generate_rappel_pdf(locataire, date_text)
-            context.bot.send_document(chat_id=update.effective_chat.id, document=open(filepath, "rb"))
-            os.remove(filepath)
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"✅ Rappel pour {locataire} généré avec succès pour la date {date_text}."
-            )
-        except Exception as e:
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"❌ Erreur lors de la génération du rappel : {str(e)}"
-            )
-
-        clear_user_state(user_id)
+    print("✅ [DEBUG] Liste des locataires pour quittance affichée.")
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
@@ -121,8 +88,9 @@ async def webhook(req: Request):
         
         update = Update.de_json(data, bot)
         dispatcher.process_update(update)
+        print("✅ [DEBUG] Mise à jour traitée par le dispatcher.")
     except Exception as e:
-        print("Erreur webhook :", e)
+        print("❌ [DEBUG] Erreur webhook :", e)
     return {"ok": True}
 
 # === Route test GET (optionnelle) ===
@@ -136,5 +104,5 @@ async def set_webhook():
     webhook_url = f"{WEBHOOK_URL}/webhook"
     bot.delete_webhook()
     response = bot.set_webhook(url=webhook_url)
-    print(f"Webhook défini : {webhook_url}")
-    print(f"Réponse Webhook : {response}")
+    print(f"✅ [DEBUG] Webhook défini : {webhook_url}")
+    print(f"✅ [DEBUG] Réponse Webhook : {response}")
