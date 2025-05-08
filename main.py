@@ -70,11 +70,9 @@ dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & ~Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_quittance_period))
 
-# ✅ Correction : Stockage du locataire dans context.user_data
-@dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
