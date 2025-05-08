@@ -1,7 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
-from utils.state import set_user_state, get_user_state, update_user_state, clear_user_state
 import os
 import zipfile
 
@@ -9,12 +8,9 @@ import zipfile
 SELECT_TENANT, ENTER_PERIOD = range(2)
 
 def handle_quittance_command(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
     tenants = ["Thomas Cohen", "Claire Dubois", "Jean Dujardin"]  # Dynamique possible via Google Sheets
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    set_user_state(user_id, {"action": "quittance"})
 
     update.message.reply_text(
         text="Quel locataire pour la quittance ?",
@@ -24,15 +20,13 @@ def handle_quittance_command(update: Update, context: CallbackContext):
     return SELECT_TENANT
 
 def handle_quittance_selection(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
     query = update.callback_query
     query.answer()
 
     try:
         tenant_name = query.data.split(":", 1)[1].strip()
-        update_user_state(user_id, "name", tenant_name)
         context.user_data['quittance_tenant'] = tenant_name
-        print(f"✅ [DEBUG] Locataire sélectionné et enregistré : {tenant_name}")
+        print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
 
         query.edit_message_text(
             f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
@@ -45,15 +39,12 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 def handle_quittance_period(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    state = get_user_state(user_id)
-    tenant_name = state.get("name") or context.user_data.get('quittance_tenant')
+    tenant_name = context.user_data.get('quittance_tenant')
     period = update.message.text.strip()
-
-    print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
+    print(f"✅ [DEBUG] Date reçue : {period} pour {tenant_name}")
 
     if not tenant_name:
-        update.message.reply_text("❌ Erreur : aucun locataire sélectionné. Utilise /quittance pour recommencer.")
+        update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
         print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
 
@@ -65,24 +56,29 @@ def handle_quittance_period(update: Update, context: CallbackContext):
     try:
         if "à" in period:
             start_month, end_month = map(str.strip, period.split("à"))
-            print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name} de {start_month} à {end_month}.")
+            print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name}.")
             filepaths = generate_quittances_pdf(tenant_name, start_month, end_month)
 
-            zip_path = create_zip_from_pdfs(filepaths, tenant_name, period)
-            print(f"✅ [DEBUG] Fichier ZIP généré : {zip_path}")
+            zip_path = "pdf/generated/quittances.zip"
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for file in filepaths:
+                    zipf.write(file, os.path.basename(file))
+                    os.remove(file)
 
             with open(zip_path, "rb") as zip_file:
                 update.message.reply_document(document=zip_file)
+            os.remove(zip_path)
 
         else:
             print(f"✅ [DEBUG] Génération d'une quittance simple pour {tenant_name}.")
             pdf_path = generate_quittance_pdf(tenant_name, period)
-            print(f"✅ [DEBUG] PDF généré : {pdf_path}")
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
+            os.remove(pdf_path)
 
-        clear_user_state(user_id)
-        update.message.reply_text(f"✅ Quittance pour {tenant_name} générée avec succès pour la période {period}.")
+        update.message.reply_text(
+            f"✅ Quittance pour {tenant_name} générée avec succès pour la période {period}."
+        )
         return ConversationHandler.END
 
     except Exception as e:
