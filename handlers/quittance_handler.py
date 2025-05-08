@@ -7,7 +7,6 @@ import zipfile
 # ✅ États pour le ConversationHandler
 SELECT_TENANT, ENTER_PERIOD = range(2)
 
-
 def handle_quittance_command(update: Update, context: CallbackContext):
     tenants = ["Thomas Cohen", "Claire Dubois", "Jean Dujardin"]  # Dynamique possible via Google Sheets
     keyboard = [
@@ -23,7 +22,6 @@ def handle_quittance_command(update: Update, context: CallbackContext):
     print("✅ [DEBUG] Commande quittance déclenchée.")
     return SELECT_TENANT
 
-
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
@@ -34,8 +32,7 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         print(f"✅ [DEBUG] Locataire sélectionné et enregistré : {tenant_name}")
 
         query.edit_message_text(
-            f"Parfait, tu veux générer une quittance pour {tenant_name}.
-Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+            f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
         )
         return ENTER_PERIOD
 
@@ -43,7 +40,6 @@ Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
         print("❌ [DEBUG] Erreur : Nom de locataire introuvable dans le callback data.")
         query.edit_message_text("❌ Erreur : Le locataire sélectionné est invalide.")
         return ConversationHandler.END
-
 
 def handle_quittance_period(update: Update, context: CallbackContext):
     tenant_name = context.user_data.get('quittance_tenant')
