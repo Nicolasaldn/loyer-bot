@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
+from utils.state import set_user_state, get_user_state, update_user_state, clear_user_state
 import os
 import zipfile
 
@@ -8,9 +9,12 @@ import zipfile
 SELECT_TENANT, ENTER_PERIOD = range(2)
 
 def handle_quittance_command(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
     tenants = ["Thomas Cohen", "Claire Dubois", "Jean Dujardin"]  # Dynamique possible via Google Sheets
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    set_user_state(user_id, {"action": "quittance"})
 
     update.message.reply_text(
         text="Quel locataire pour la quittance ?",
@@ -20,12 +24,13 @@ def handle_quittance_command(update: Update, context: CallbackContext):
     return SELECT_TENANT
 
 def handle_quittance_selection(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
     query = update.callback_query
     query.answer()
 
     try:
         tenant_name = query.data.split(":", 1)[1].strip()
-        context.user_data['quittance_tenant'] = tenant_name
+        update_user_state(user_id, "name", tenant_name)
         print(f"✅ [DEBUG] Locataire sélectionné et enregistré : {tenant_name}")
 
         query.edit_message_text(
@@ -39,8 +44,11 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 def handle_quittance_period(update: Update, context: CallbackContext):
-    tenant_name = context.user_data.get('quittance_tenant')
+    user_id = update.effective_user.id
+    state = get_user_state(user_id)
+    tenant_name = state.get("name")
     period = update.message.text.strip()
+
     print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
 
     if not tenant_name:
@@ -72,6 +80,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
 
+        clear_user_state(user_id)
         update.message.reply_text(f"✅ Quittance pour {tenant_name} générée avec succès pour la période {period}.")
         return ConversationHandler.END
 
