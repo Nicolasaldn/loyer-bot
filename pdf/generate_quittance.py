@@ -59,3 +59,15 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.output(filepath)
 
     return filepath
+def generate_quittances_pdf(nom_locataire: str, date_debut: str, date_fin: str) -> list:
+    start = datetime.strptime(date_debut, "%d/%m/%Y")
+    end = datetime.strptime(date_fin, "%d/%m/%Y")
+    fichiers = []
+
+    current = start
+    while current <= end:
+        filepath = generate_quittance_pdf(nom_locataire, current)
+        fichiers.append(filepath)
+        current = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+    return fichiers
