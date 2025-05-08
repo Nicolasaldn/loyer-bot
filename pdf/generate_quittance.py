@@ -1,3 +1,30 @@
+from fpdf import FPDF
+import os
+from datetime import datetime, timedelta
+from utils.sheets import get_locataire_info
+
+FONT_PATH_REGULAR = "pdf/DejaVuSans.ttf"
+FONT_PATH_BOLD = "pdf/DejaVuSans-Bold.ttf"
+FONT_PATH_ITALIC = "pdf/DejaVuSans-Oblique.ttf"
+
+class QuittancePDF(FPDF):
+    def __init__(self):
+        super().__init__(orientation="P", unit="mm", format="A4")
+        self.set_auto_page_break(auto=True, margin=20)
+        self.add_font("DejaVu", "", FONT_PATH_REGULAR, uni=True)
+        self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
+        self.add_font("DejaVu", "I", FONT_PATH_ITALIC, uni=True)
+        self.set_font("DejaVu", "", 10)
+
+    def header(self):
+        pass  # En-tête vide pour personnalisation manuelle
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("DejaVu", "I", 8)
+        self.cell(0, 10, f"Page {self.page_no()}", align="C")
+
+
 def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generated"):
     if isinstance(date_obj, str):
         date_obj = datetime.strptime(date_obj, "%d/%m/%Y")
@@ -59,6 +86,8 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.output(filepath)
 
     return filepath
+
+
 def generate_quittances_pdf(nom_locataire: str, date_debut: str, date_fin: str) -> list:
     start = datetime.strptime(date_debut, "%d/%m/%Y")
     end = datetime.strptime(date_fin, "%d/%m/%Y")
