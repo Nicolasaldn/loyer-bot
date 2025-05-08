@@ -119,14 +119,16 @@ def handle_quittance_period(update: Update, context: CallbackContext):
         update.message.reply_document(document=open(pdf_path, "rb"))
         os.remove(pdf_path)
     else:
-        filepaths = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
-        update.message.reply_document(document=open(filepaths, "rb"))
-        os.remove(filepaths)
+        pdf_files = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
+        for file in pdf_files:
+            update.message.reply_document(document=open(file, "rb"))
+            os.remove(file)
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_message, pattern="^(rappel|quittance):"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram avec Debug ===
