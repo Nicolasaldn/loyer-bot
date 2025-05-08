@@ -64,8 +64,11 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             
             # ✅ Suppression des fichiers temporaires
             for path in filepaths:
-                os.remove(path)
-            os.remove(zip_path)
+                if os.path.exists(path):
+                    os.remove(path)
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+            
             print(f"✅ [DEBUG] Fichier ZIP envoyé : {zip_path}")
         else:
             print("✅ [DEBUG] Génération d'une quittance simple.")
@@ -75,7 +78,8 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
             
-            os.remove(pdf_path)
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
             print(f"✅ [DEBUG] PDF simple envoyé : {pdf_path}")
 
         update.message.reply_text(
@@ -91,4 +95,33 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 # ✅ Génération de plusieurs quittances (PDFs dans un ZIP)
 def generate_multiple_quittances(tenant_name, start_month, end_month):
     print(f"✅ [DEBUG] Génération de quittances de {start_month} à {end_month} pour {tenant_name}")
-    from
+    from pdf.generate_quittance import generate_quittance_pdf
+    months = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    ]
+    
+    start_index = months.index(start_month.lower())
+    end_index = months.index(end_month.lower()) + 1
+
+    filepaths = []
+
+    for month in months[start_index:end_index]:
+        filepath = f"pdf/{tenant_name}_quittance_{month}.pdf"
+        generate_quittance_pdf(tenant_name, month, filepath)
+        filepaths.append(filepath)
+        print(f"✅ [DEBUG] Quittance générée : {filepath}")
+
+    return filepaths
+
+# ✅ Création d'un fichier ZIP avec les quittances multiples
+def create_zip_from_pdfs(filepaths, tenant_name, period):
+    zip_filename = f"pdf/{tenant_name}_quittances_{period.replace(' ', '_')}.zip"
+    with zipfile.ZipFile(zip_filename, 'w') as zipf:
+        for filepath in filepaths:
+            if os.path.exists(filepath):
+                zipf.write(filepath, os.path.basename(filepath))
+                print(f"✅ [DEBUG] Fichier ajouté au ZIP : {filepath}")
+
+    print(f"✅ [DEBUG] ZIP créé : {zip_filename}")
+    return zip_filename
