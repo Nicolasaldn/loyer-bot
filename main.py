@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, ConversationHandler
 import os
 import json
 
@@ -18,80 +18,43 @@ from handlers.quittance_handler import (
     handle_quittance_period
 )
 from utils.sheets import list_tenants
-from utils.state import set_user_state, get_user_state, clear_user_state
 
 # === Initialisation FastAPI ===
 app = FastAPI()
 
-# === Variables d'environnement ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# === Initialisation bot Telegram ===
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
-# === Gestion des callbacks ===
-def handle_rappel_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /rappel déclenchée.")
-    query = update.callback_query
-    query.answer()
-    
-    tenants = list_tenants()
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"rappel:{name}")]
-        for name in tenants
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    query.edit_message_text(
-        text="Quel locataire pour le rappel ?",
-        reply_markup=reply_markup
-    )
-    print("✅ [DEBUG] Liste des locataires affichée.")
-
-def handle_quittance_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /quittance déclenchée.")
-    query = update.callback_query
-    query.answer()
-    
-    tenants = list_tenants()
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"quittance:{name}")]
-        for name in tenants
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    query.edit_message_text(
-        text="Quel locataire pour la quittance ?",
-        reply_markup=reply_markup
-    )
-    print("✅ [DEBUG] Liste des locataires pour quittance affichée.")
+# === Configuration ConversationHandler ===
+quittance_handler = ConversationHandler(
+    entry_points=[CommandHandler("quittance", handle_quittance_command)],
+    states={
+        0: [CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:")],
+        1: [MessageHandler(Filters.text & ~Filters.command, handle_quittance_period)]
+    },
+    fallbacks=[]
+)
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
-
-# ✅ Gestion des rappels
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
+dispatcher.add_handler(quittance_handler)
+dispatcher.add_handler(CommandHandler("rappel", handle_rappel_command))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:"))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_rappel_date))
 
-# ✅ Gestion des quittances
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:"))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & ~Filters.regex(r"^\d{2}/\d{2}/\d{4}$"), handle_quittance_period))
-
-# ✅ Handler général pour les autres messages
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
-# === Route webhook Telegram avec Debug ===
+# === Route webhook Telegram ===
 @app.post("/webhook")
 async def webhook(req: Request):
     try:
         data = await req.json()
         print("==== Requête reçue ====")
         print(json.dumps(data, indent=4))
-        
+
         update = Update.de_json(data, bot)
         dispatcher.process_update(update)
         print("✅ [DEBUG] Mise à jour traitée par le dispatcher.")
@@ -99,12 +62,10 @@ async def webhook(req: Request):
         print("❌ [DEBUG] Erreur webhook :", e)
     return {"ok": True}
 
-# === Route test GET (optionnelle) ===
 @app.get("/")
 async def root():
     return {"message": "Bot opérationnel ✅"}
 
-# === Enregistrement webhook à chaque startup avec Debug ===
 @app.on_event("startup")
 async def set_webhook():
     webhook_url = f"{WEBHOOK_URL}/webhook"
