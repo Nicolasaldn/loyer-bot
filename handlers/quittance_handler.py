@@ -7,9 +7,13 @@ import zipfile
 # ✅ États pour le ConversationHandler
 SELECT_TENANT, ENTER_PERIOD = range(2)
 
+
 def handle_quittance_command(update: Update, context: CallbackContext):
     tenants = ["Thomas Cohen", "Claire Dubois", "Jean Dujardin"]  # Dynamique possible via Google Sheets
-    keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
+    keyboard = [
+        [InlineKeyboardButton(name, callback_data=f"quittance:{name}")]
+        for name in tenants
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     update.message.reply_text(
@@ -19,39 +23,37 @@ def handle_quittance_command(update: Update, context: CallbackContext):
     print("✅ [DEBUG] Commande quittance déclenchée.")
     return SELECT_TENANT
 
+
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
 
     try:
         tenant_name = query.data.split(":", 1)[1].strip()
-        context.chat_data['quittance_tenant'] = tenant_name  # Utilise chat_data pour persister
-        print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
+        context.user_data['quittance_tenant'] = tenant_name
+        print(f"✅ [DEBUG] Locataire sélectionné et enregistré : {tenant_name}")
 
         query.edit_message_text(
-            f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2024 ou de janvier à mars 2024)."
+            f"Parfait, tu veux générer une quittance pour {tenant_name}.
+Indique la période (ex: janvier 2024 ou de janvier à mars 2024)."
         )
         return ENTER_PERIOD
 
     except IndexError:
-        query.edit_message_text("❌ Erreur : Le locataire sélectionné est invalide.")
         print("❌ [DEBUG] Erreur : Nom de locataire introuvable dans le callback data.")
+        query.edit_message_text("❌ Erreur : Le locataire sélectionné est invalide.")
         return ConversationHandler.END
 
-def handle_quittance_period(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Début handle_quittance_period")
-    print(f"✅ [DEBUG] Chat Data Actuel : {context.chat_data}")
 
-    tenant_name = context.chat_data.get('quittance_tenant')
-    print(f"✅ [DEBUG] Récupération du locataire : {tenant_name}")
+def handle_quittance_period(update: Update, context: CallbackContext):
+    tenant_name = context.user_data.get('quittance_tenant')
+    period = update.message.text.strip()
+    print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
         print("❌ [DEBUG] Aucun locataire sélectionné.")
         return ConversationHandler.END
-
-    period = update.message.text.strip()
-    print(f"✅ [DEBUG] Date reçue : {period} pour {tenant_name}")
 
     if not period:
         update.message.reply_text("❌ Erreur : aucune période fournie.")
@@ -64,24 +66,20 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 
         if "à" in period:
             start_month, end_month = map(str.strip, period.split("à"))
-            print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name}.")
+            print(f"✅ [DEBUG] Génération de quittances multiples pour {tenant_name} de {start_month} à {end_month}.")
             filepaths = generate_quittances_pdf(tenant_name, start_month, end_month)
-
             zip_path = os.path.join(output_dir, f"Quittances_{tenant_name.replace(' ', '_')}.zip")
             with zipfile.ZipFile(zip_path, "w") as zipf:
                 for file in filepaths:
                     zipf.write(file, os.path.basename(file))
                     os.remove(file)
-
             with open(zip_path, "rb") as zip_file:
                 update.message.reply_document(document=zip_file)
             os.remove(zip_path)
 
         else:
-            print(f"✅ [DEBUG] Génération d'une quittance simple pour {tenant_name}.")
+            print(f"✅ [DEBUG] Génération d'une quittance simple pour {tenant_name} pour la période {period}.")
             pdf_path = generate_quittance_pdf(tenant_name, period, output_dir=output_dir)
-            print(f"✅ [DEBUG] PDF généré pour {tenant_name} à {pdf_path}")
-
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
             os.remove(pdf_path)
