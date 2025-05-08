@@ -1,30 +1,3 @@
-from fpdf import FPDF
-import os
-from datetime import datetime, timedelta
-from utils.sheets import get_locataire_info
-
-FONT_PATH_REGULAR = "pdf/DejaVuSans.ttf"
-FONT_PATH_BOLD = "pdf/DejaVuSans-Bold.ttf"
-FONT_PATH_ITALIC = "pdf/DejaVuSans-Oblique.ttf"
-
-class QuittancePDF(FPDF):
-    def __init__(self):
-        super().__init__(orientation="P", unit="mm", format="A4")
-        self.set_auto_page_break(auto=True, margin=20)
-        self.add_font("DejaVu", "", FONT_PATH_REGULAR, uni=True)
-        self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
-        self.add_font("DejaVu", "I", FONT_PATH_ITALIC, uni=True)
-        self.set_font("DejaVu", "", 10)
-
-    def header(self):
-        pass  # En-tête vide pour personnalisation manuelle
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font("DejaVu", "I", 8)
-        self.cell(0, 10, f"Page {self.page_no()}", align="C")
-
-
 def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generated"):
     if isinstance(date_obj, str):
         date_obj = datetime.strptime(date_obj, "%d/%m/%Y")
@@ -49,14 +22,18 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.set_font("DejaVu", "B", 11)
     pdf.cell(0, 6, "Adresse de la location :", ln=True)
     pdf.set_font("DejaVu", "", 11)
-    pdf.multi_cell(0, 6, infos["adresse_location"])
+    pdf.multi_cell(0, 6, infos.get("locataire_adresse", "Adresse inconnue"))
     pdf.ln(4)
 
     # Paragraphe principal
+    bailleur_nom = infos.get("bailleur_nom", "Nom bailleur inconnu")
+    locataire_nom = infos.get("locataire_nom", "Nom locataire inconnu")
+    montant_loyer = infos.get("loyer_ttc", 0.00)
+
     pdf.set_font("DejaVu", "", 11)
     texte = (
-        f"Je soussigné(e) {infos['bailleur_nom']} propriétaire du logement désigné ci-dessus, déclare avoir reçu "
-        f"de Mme {infos['locataire_nom']} la somme de {infos['loyer_ttc']:.0f} euros ({infos['loyer_ttc']:.0f} €), "
+        f"Je soussigné(e) {bailleur_nom} propriétaire du logement désigné ci-dessus, déclare avoir reçu "
+        f"de Mme {locataire_nom} la somme de {montant_loyer:.0f} euros ({montant_loyer:.0f} €), "
         f"au titre du paiement du loyer et des charges pour la période de location du {date_debut.strftime('%d/%m/%Y')} "
         f"au {date_fin.strftime('%d/%m/%Y')} et lui en donne quittance, sous réserve de tous mes droits."
     )
@@ -68,16 +45,16 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.cell(0, 6, "Détail du règlement :", ln=True)
     pdf.set_font("DejaVu", "", 11)
     pdf.cell(40, 6, "Loyer :", ln=False)
-    pdf.cell(0, 6, f"{infos['loyer_ttc']:.0f} euros", ln=True)
+    pdf.cell(0, 6, f"{montant_loyer:.0f} euros", ln=True)
     pdf.cell(40, 6, "Date du paiement :", ln=False)
-    pdf.cell(0, 6, infos["date_paiement"], ln=True)
+    pdf.cell(0, 6, infos.get("date_paiement", "Non précisée"), ln=True)
     pdf.ln(10)
 
     # Date et signature
     pdf.set_font("DejaVu", "", 11)
     pdf.cell(0, 6, f"Fait le {date_du_jour}", ln=True)
     pdf.ln(10)
-    pdf.cell(0, 6, infos["bailleur_nom"], ln=True, align="R")
+    pdf.cell(0, 6, bailleur_nom, ln=True, align="R")
 
     # Génération du fichier
     os.makedirs(output_dir, exist_ok=True)
@@ -86,17 +63,3 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.output(filepath)
 
     return filepath
-
-
-def generate_quittances_pdf(nom_locataire: str, date_debut: str, date_fin: str) -> list:
-    start = datetime.strptime(date_debut, "%d/%m/%Y")
-    end = datetime.strptime(date_fin, "%d/%m/%Y")
-    fichiers = []
-
-    current = start
-    while current <= end:
-        filepath = generate_quittance_pdf(nom_locataire, current)
-        fichiers.append(filepath)
-        current = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
-
-    return fichiers
