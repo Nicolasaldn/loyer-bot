@@ -31,6 +31,7 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
     try:
         tenant_name = query.data.split(":", 1)[1].strip()
         update_user_state(user_id, "name", tenant_name)
+        context.user_data['quittance_tenant'] = tenant_name
         print(f"✅ [DEBUG] Locataire sélectionné et enregistré : {tenant_name}")
 
         query.edit_message_text(
@@ -46,7 +47,7 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
 def handle_quittance_period(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     state = get_user_state(user_id)
-    tenant_name = state.get("name")
+    tenant_name = state.get("name") or context.user_data.get('quittance_tenant')
     period = update.message.text.strip()
 
     print(f"✅ [DEBUG] Période reçue : {period} pour {tenant_name}")
