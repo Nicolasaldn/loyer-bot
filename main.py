@@ -97,7 +97,7 @@ dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^r
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
 
-# === ConversationHandler pour ajouter locataire ===
+# === ConversationHandler pour ajouter locataire et bailleur ===
 dispatcher.add_handler(ConversationHandler(
     entry_points=[CommandHandler("ajouter_locataire", handle_add_tenant)],
     states={
