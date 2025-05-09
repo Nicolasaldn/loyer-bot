@@ -62,7 +62,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             start_date = datetime(datetime.now().year, FRENCH_MONTHS[start.split()[0]], 1)
             end_date = datetime(datetime.now().year, FRENCH_MONTHS[end.split()[0]], 28)
 
-        if start_date == end_date:
+        if start_date.month == end_date.month and start_date.year == end_date.year:
             pdf_path = generate_quittance_pdf(tenant_name, start_date)
             with open(pdf_path, "rb") as pdf_file:
                 update.message.reply_document(document=pdf_file)
