@@ -18,6 +18,11 @@ from handlers.quittance_handler import (
     handle_quittance_selection,
     handle_quittance_period
 )
+from handlers.locataire_bailleur_handler import (
+    handle_add_tenant,
+    handle_add_landlord
+)
+
 from utils.sheets import list_tenants
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
 from pdf.generate_rappel import generate_rappel_pdf
@@ -89,6 +94,8 @@ dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/r
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:(.*)$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
+dispatcher.add_handler(CommandHandler("ajouter_locataire", handle_add_tenant))
+dispatcher.add_handler(CommandHandler("ajouter_bailleur", handle_add_landlord))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
 # === Route webhook Telegram avec Debug ===
