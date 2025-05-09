@@ -1,15 +1,25 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import CallbackContext
 from utils.sheets import list_tenants
+import time
 
 def start(update: Update, context: CallbackContext):
-    try:
-        tenants = list_tenants()
-    except Exception as e:
-        print(f"❌ [DEBUG] Erreur de connexion à Google Sheets : {e}")
+    attempts = 0
+    tenants = None
+
+    while attempts < 3:
+        try:
+            tenants = list_tenants()
+            break
+        except Exception as e:
+            attempts += 1
+            print(f"❌ [DEBUG] Tentative {attempts}/3 - Erreur de connexion à Google Sheets : {e}")
+            time.sleep(2)  # Petite pause entre les tentatives
+
+    if not tenants:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="❌ Erreur : Impossible de récupérer les locataires (Google Sheets indisponible)."
+            text="❌ Erreur : Google Sheets est actuellement inaccessible après 3 tentatives."
         )
         return
 
