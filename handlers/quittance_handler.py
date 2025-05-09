@@ -35,7 +35,7 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
     print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
 
     query.edit_message_text(
-        f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2025 ou de janvier 2025 à mars 2025)."
+        f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2025 ou janvier 2025 à mars 2025)."
     )
     return ENTER_PERIOD
 
