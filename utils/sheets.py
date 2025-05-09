@@ -31,12 +31,10 @@ def get_locataire_info(nom_locataire: str) -> dict:
     rows_interface = interface.get_all_records()
     rows_db = db.get_all_records()
 
-    # Match locataire
     loc_data = next((r for r in rows_interface if r["Nom"].strip().lower() == nom_locataire.strip().lower()), None)
     if not loc_data:
         raise ValueError(f"Locataire {nom_locataire} introuvable dans la feuille Interface.")
 
-    # Match bailleur
     nom_bailleur = loc_data.get("Propriétaire") or loc_data.get("Proprietaire")
     bail_data = next((r for r in rows_db if r["Nom du proprietaire"].strip().lower() == nom_bailleur.strip().lower()), None)
     if not bail_data:
@@ -51,3 +49,22 @@ def get_locataire_info(nom_locataire: str) -> dict:
         "loyer_ttc": float(loc_data["Loyer TTC (€)"]),
         "frequence": loc_data["Fréquence"].lower()
     }
+
+def add_tenant(nom, email, adresse, loyer, frequence, proprietaire):
+    interface = get_worksheet(TAB_INTERFACE)
+    rows = interface.get_all_records()
+
+    if any(row["Nom"].strip().lower() == nom.strip().lower() for row in rows):
+        raise ValueError("Locataire déjà existant.")
+
+    interface.append_row([nom, email, adresse, loyer, frequence, proprietaire])
+
+
+def add_landlord(nom, adresse):
+    db = get_worksheet(TAB_DB)
+    rows = db.get_all_records()
+
+    if any(row["Nom du proprietaire"].strip().lower() == nom.strip().lower() for row in rows):
+        raise ValueError("Bailleur déjà existant.")
+
+    db.append_row([nom, adresse])
