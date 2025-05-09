@@ -35,7 +35,7 @@ def handle_quittance_selection(update: Update, context: CallbackContext):
     print(f"✅ [DEBUG] Locataire sélectionné : {tenant_name}")
 
     query.edit_message_text(
-        f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2025 ou janvier 2025 à mars 2025)."
+        f"Parfait, tu veux générer une quittance pour {tenant_name}.\nIndique la période (ex: janvier 2025 ou de janvier 2025 à mars 2025)."
     )
     return ENTER_PERIOD
 
@@ -62,17 +62,23 @@ def handle_quittance_period(update: Update, context: CallbackContext):
             start_date = datetime(datetime.now().year, FRENCH_MONTHS[start.split()[0]], 1)
             end_date = datetime(datetime.now().year, FRENCH_MONTHS[end.split()[0]], 28)
 
-        filepaths = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
+        if start_date == end_date:
+            pdf_path = generate_quittance_pdf(tenant_name, start_date)
+            with open(pdf_path, "rb") as pdf_file:
+                update.message.reply_document(document=pdf_file)
+            os.remove(pdf_path)
+        else:
+            filepaths = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
 
-        zip_path = os.path.join("pdf/generated/", f"Quittances_{tenant_name.replace(' ', '_')}.zip")
-        with zipfile.ZipFile(zip_path, "w") as zipf:
-            for file in filepaths:
-                zipf.write(file, os.path.basename(file))
-                os.remove(file)
+            zip_path = os.path.join("pdf/generated/", f"Quittances_{tenant_name.replace(' ', '_')}.zip")
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for file in filepaths:
+                    zipf.write(file, os.path.basename(file))
+                    os.remove(file)
 
-        with open(zip_path, "rb") as zip_file:
-            update.message.reply_document(document=zip_file)
-        os.remove(zip_path)
+            with open(zip_path, "rb") as zip_file:
+                update.message.reply_document(document=zip_file)
+            os.remove(zip_path)
 
         update.message.reply_text(f"✅ Quittance générée avec succès pour {tenant_name}.")
 
