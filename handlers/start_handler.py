@@ -14,7 +14,9 @@ def start(update: Update, context: CallbackContext):
     # Création des boutons inline (cliquables)
     keyboard = [
         [InlineKeyboardButton("📄 Envoyer un Rappel", callback_data="/rappel")],
-        [InlineKeyboardButton("📃 Générer une Quittance", callback_data="/quittance")]
+        [InlineKeyboardButton("📃 Générer une Quittance", callback_data="/quittance")],
+        [InlineKeyboardButton("👥 Ajouter un Locataire", callback_data="/ajouter_locataire")],
+        [InlineKeyboardButton("🏡 Ajouter un Bailleur", callback_data="/ajouter_bailleur")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
