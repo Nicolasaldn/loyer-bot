@@ -30,7 +30,14 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
         date_obj = datetime.strptime(date_obj, "%d/%m/%Y")
 
     infos = get_locataire_info(nom_locataire)
-    mois_str = date_obj.strftime("%B %Y")
+    FRENCH_MONTHS = {
+    1: "janvier", 2: "février", 3: "mars", 4: "avril",
+    5: "mai", 6: "juin", 7: "juillet", 8: "août",
+    9: "septembre", 10: "octobre", 11: "novembre", 12: "décembre"
+}
+
+mois_str = f"{FRENCH_MONTHS[date_obj.month]} {date_obj.year}"
+
     date_du_jour = datetime.now().strftime("%d/%m/%Y")
     date_debut = date_obj.replace(day=1)
     date_fin = (date_obj.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
