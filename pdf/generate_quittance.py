@@ -84,7 +84,6 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.cell(0, 6, f"{montant_loyer:.0f} euros", ln=True)
     pdf.cell(40, 6, "Date du paiement :", ln=False)
     pdf.cell(0, 6, date_paiement, ln=True)
-
     pdf.ln(10)
 
     # Date et signature
@@ -100,3 +99,17 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
     pdf.output(filepath)
 
     return filepath
+
+
+def generate_quittances_pdf(nom_locataire: str, date_debut: str, date_fin: str) -> list:
+    start = datetime.strptime(date_debut, "%d/%m/%Y")
+    end = datetime.strptime(date_fin, "%d/%m/%Y")
+    fichiers = []
+
+    current = start
+    while current <= end:
+        filepath = generate_quittance_pdf(nom_locataire, current)
+        fichiers.append(filepath)
+        current = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+    return fichiers
