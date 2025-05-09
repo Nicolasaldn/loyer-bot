@@ -7,6 +7,12 @@ FONT_PATH_REGULAR = "pdf/DejaVuSans.ttf"
 FONT_PATH_BOLD = "pdf/DejaVuSans-Bold.ttf"
 FONT_PATH_ITALIC = "pdf/DejaVuSans-Oblique.ttf"
 
+FRENCH_MONTHS = {
+    1: "janvier", 2: "février", 3: "mars", 4: "avril",
+    5: "mai", 6: "juin", 7: "juillet", 8: "août",
+    9: "septembre", 10: "octobre", 11: "novembre", 12: "décembre"
+}
+
 class QuittancePDF(FPDF):
     def __init__(self):
         super().__init__(orientation="P", unit="mm", format="A4")
@@ -30,13 +36,7 @@ def generate_quittance_pdf(nom_locataire: str, date_obj, output_dir="pdf/generat
         date_obj = datetime.strptime(date_obj, "%d/%m/%Y")
 
     infos = get_locataire_info(nom_locataire)
-    FRENCH_MONTHS = {
-    1: "janvier", 2: "février", 3: "mars", 4: "avril",
-    5: "mai", 6: "juin", 7: "juillet", 8: "août",
-    9: "septembre", 10: "octobre", 11: "novembre", 12: "décembre"
-}
-
-mois_str = f"{FRENCH_MONTHS[date_obj.month]} {date_obj.year}"
+    mois_str = f"{FRENCH_MONTHS[date_obj.month]} {date_obj.year}"
 
     date_du_jour = datetime.now().strftime("%d/%m/%Y")
     date_debut = date_obj.replace(day=1)
@@ -84,6 +84,7 @@ mois_str = f"{FRENCH_MONTHS[date_obj.month]} {date_obj.year}"
     pdf.cell(0, 6, f"{montant_loyer:.0f} euros", ln=True)
     pdf.cell(40, 6, "Date du paiement :", ln=False)
     pdf.cell(0, 6, date_paiement, ln=True)
+
     pdf.ln(10)
 
     # Date et signature
@@ -99,17 +100,3 @@ mois_str = f"{FRENCH_MONTHS[date_obj.month]} {date_obj.year}"
     pdf.output(filepath)
 
     return filepath
-
-
-def generate_quittances_pdf(nom_locataire: str, date_debut: str, date_fin: str) -> list:
-    start = datetime.strptime(date_debut, "%d/%m/%Y")
-    end = datetime.strptime(date_fin, "%d/%m/%Y")
-    fichiers = []
-
-    current = start
-    while current <= end:
-        filepath = generate_quittance_pdf(nom_locataire, current)
-        fichiers.append(filepath)
-        current = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
-
-    return fichiers
