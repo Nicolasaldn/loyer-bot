@@ -4,7 +4,9 @@ from utils.sheets import list_tenants
 
 def start(update: Update, context: CallbackContext):
     try:
+        print("✅ [DEBUG] Tentative de connexion à Google Sheets...")
         tenants = list_tenants()
+        print(f"✅ [DEBUG] Locataires récupérés : {tenants}")
     except Exception as e:
         print(f"❌ [DEBUG] Erreur de connexion à Google Sheets : {e}")
         tenants = []
