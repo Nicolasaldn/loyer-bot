@@ -3,14 +3,25 @@ from telegram.ext import CallbackContext
 from utils.sheets import list_tenants
 
 def start(update: Update, context: CallbackContext):
-    tenants = list_tenants()
-    
+    try:
+        tenants = list_tenants()
+    except Exception as e:
+        print(f"❌ [DEBUG] Erreur de connexion à Google Sheets : {e}")
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Erreur : Impossible de récupérer les locataires (Google Sheets indisponible)."
+        )
+        return
+
     # Création du message avec la liste des locataires
     message = "Bonjour ! Comment puis-je t'assister aujourd'hui ?\n\n"
-    message += "Voici les locataires disponibles :\n"
-    for t in tenants:
-        message += f"• {t}\n"
-    
+    if tenants:
+        message += "Voici les locataires disponibles :\n"
+        for t in tenants:
+            message += f"• {t}\n"
+    else:
+        message += "Aucun locataire disponible pour le moment."
+
     # Création des boutons inline (cliquables)
     keyboard = [
         [InlineKeyboardButton("📄 Envoyer un Rappel", callback_data="/rappel")],
