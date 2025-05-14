@@ -7,15 +7,19 @@ from utils.state import set_user_state, get_user_state, clear_user_state
 ADD_TENANT_NAME, ADD_TENANT_EMAIL, ADD_TENANT_ADDRESS, ADD_TENANT_RENT, ADD_TENANT_FREQUENCY, ADD_TENANT_LANDLORD = range(6)
 ADD_LANDLORD_NAME, ADD_LANDLORD_ADDRESS = range(2)
 
-# === Gestion de l'ajout de locataire ===
 def handle_add_tenant(update: Update, context: CallbackContext):
-    update.message.reply_text("Quel est le nom du locataire ?")
+    if update.message:
+        update.message.reply_text("Quel est le nom du locataire ?")
+    elif update.callback_query:
+        update.callback_query.message.reply_text("Quel est le nom du locataire ?")
     return ADD_TENANT_NAME
 
-def handle_add_tenant_name(update: Update, context: CallbackContext):
-    context.user_data['tenant_name'] = update.message.text
-    update.message.reply_text("Quel est l'email du locataire ?")
-    return ADD_TENANT_EMAIL
+def handle_add_landlord(update: Update, context: CallbackContext):
+    if update.message:
+        update.message.reply_text("Quel est le nom du bailleur ?")
+    elif update.callback_query:
+        update.callback_query.message.reply_text("Quel est le nom du bailleur ?")
+    return ADD_LANDLORD_NAME
 
 # Fonction suivante pour l'email, l'adresse, le loyer, etc.
 def handle_add_tenant_email(update: Update, context: CallbackContext):
