@@ -71,6 +71,19 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
+def handle_text_message(update: Update, context: CallbackContext):
+    if not update.message or not update.message.text:
+        return
+
+    message_text = update.message.text.strip()
+
+    if "quittance_tenant" in context.user_data:
+        handle_quittance_period(update, context)
+    elif "rappel_tenant" in context.user_data:
+        handle_rappel_date(update, context)
+    else:
+        update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
+
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
