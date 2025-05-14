@@ -40,8 +40,11 @@ dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
 # === Gestion des callbacks ===
 def handle_quittance_callback(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Commande /quittance déclenchée.")
     query = update.callback_query
     query.answer()
+
+    context.user_data.pop("rappel_tenant", None)
 
     tenants = list_tenants()
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
@@ -52,10 +55,12 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
-# === Gestion des rappels ===
 def handle_rappel_callback(update: Update, context: CallbackContext):
+    print("✅ [DEBUG] Commande /rappel déclenchée.")
     query = update.callback_query
     query.answer()
+
+    context.user_data.pop("quittance_tenant", None)
 
     tenants = list_tenants()
     keyboard = [[InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants]
@@ -70,8 +75,8 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
+dispatcher.add_handler(CallbackQueryHandler(lambda update, context: context.bot.send_message(chat_id=update.effective_chat.id, text="/ajouter_locataire"), pattern="^/ajouter_locataire$"))
+dispatcher.add_handler(CallbackQueryHandler(lambda update, context: context.bot.send_message(chat_id=update.effective_chat.id, text="/ajouter_bailleur"), pattern="^/ajouter_bailleur$"))
 
 # === ConversationHandler pour ajouter locataire ===
 dispatcher.add_handler(ConversationHandler(
@@ -97,9 +102,8 @@ dispatcher.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
-# === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
 async def webhook(req: Request):
     try:
