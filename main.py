@@ -88,8 +88,8 @@ def handle_text_message(update: Update, context: CallbackContext):
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(lambda update, context: context.bot.send_message(chat_id=update.effective_chat.id, text="/ajouter_locataire"), pattern="^/ajouter_locataire$"))
-dispatcher.add_handler(CallbackQueryHandler(lambda update, context: context.bot.send_message(chat_id=update.effective_chat.id, text="/ajouter_bailleur"), pattern="^/ajouter_bailleur$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
 
 # === ConversationHandler pour ajouter locataire ===
 dispatcher.add_handler(ConversationHandler(
