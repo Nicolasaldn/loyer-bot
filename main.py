@@ -22,7 +22,9 @@ from handlers.locataire_bailleur_handler import (
     handle_add_tenant,
     handle_add_tenant_name, handle_add_tenant_email, handle_add_tenant_address,
     handle_add_tenant_rent, handle_add_tenant_frequency, handle_add_tenant_landlord,
-    handle_add_landlord, handle_add_landlord_name, handle_add_landlord_address
+    handle_add_landlord, handle_add_landlord_name, handle_add_landlord_address,
+    ADD_TENANT_NAME, ADD_TENANT_EMAIL, ADD_TENANT_ADDRESS, ADD_TENANT_RENT,
+    ADD_TENANT_FREQUENCY, ADD_TENANT_LANDLORD, ADD_LANDLORD_NAME, ADD_LANDLORD_ADDRESS
 )
 
 from utils.sheets import list_tenants
@@ -71,19 +73,6 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
-def handle_text_message(update: Update, context: CallbackContext):
-    if not update.message or not update.message.text:
-        return
-
-    message_text = update.message.text.strip()
-
-    if "quittance_tenant" in context.user_data:
-        handle_quittance_period(update, context)
-    elif "rappel_tenant" in context.user_data:
-        handle_rappel_date(update, context)
-    else:
-        update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
-
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
@@ -95,12 +84,12 @@ dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajou
 dispatcher.add_handler(ConversationHandler(
     entry_points=[CommandHandler("ajouter_locataire", handle_add_tenant)],
     states={
-        0: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_name)],
-        1: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_email)],
-        2: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_address)],
-        3: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_rent)],
-        4: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_frequency)],
-        5: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_landlord)]
+        ADD_TENANT_NAME: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_name)],
+        ADD_TENANT_EMAIL: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_email)],
+        ADD_TENANT_ADDRESS: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_address)],
+        ADD_TENANT_RENT: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_rent)],
+        ADD_TENANT_FREQUENCY: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_frequency)],
+        ADD_TENANT_LANDLORD: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_landlord)]
     },
     fallbacks=[]
 ))
@@ -109,8 +98,8 @@ dispatcher.add_handler(ConversationHandler(
 dispatcher.add_handler(ConversationHandler(
     entry_points=[CommandHandler("ajouter_bailleur", handle_add_landlord)],
     states={
-        0: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_name)],
-        1: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_address)]
+        ADD_LANDLORD_NAME: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_name)],
+        ADD_LANDLORD_ADDRESS: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_address)]
     },
     fallbacks=[]
 ))
