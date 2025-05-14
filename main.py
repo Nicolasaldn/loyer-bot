@@ -42,11 +42,8 @@ dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
 # === Gestion des callbacks ===
 def handle_quittance_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /quittance déclenchée.")
     query = update.callback_query
     query.answer()
-
-    context.user_data.pop("rappel_tenant", None)
 
     tenants = list_tenants()
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
@@ -58,11 +55,8 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
     )
 
 def handle_rappel_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /rappel déclenchée.")
     query = update.callback_query
     query.answer()
-
-    context.user_data.pop("quittance_tenant", None)
 
     tenants = list_tenants()
     keyboard = [[InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants]
@@ -72,6 +66,10 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         text="Quel locataire pour le rappel ?",
         reply_markup=reply_markup
     )
+
+# === Gestion des messages textuels ===
+def handle_text_message(update: Update, context: CallbackContext):
+    update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
