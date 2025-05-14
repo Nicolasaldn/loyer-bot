@@ -40,16 +40,11 @@ dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
 # === Gestion des callbacks ===
 def handle_quittance_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /quittance déclenchée.")
     query = update.callback_query
     query.answer()
 
-    context.user_data.pop("rappel_tenant", None)
-
     tenants = list_tenants()
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants
-    ]
+    keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     query.edit_message_text(
@@ -59,16 +54,11 @@ def handle_quittance_callback(update: Update, context: CallbackContext):
 
 # === Gestion des rappels ===
 def handle_rappel_callback(update: Update, context: CallbackContext):
-    print("✅ [DEBUG] Commande /rappel déclenchée.")
     query = update.callback_query
     query.answer()
 
-    context.user_data.pop("quittance_tenant", None)
-
     tenants = list_tenants()
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants
-    ]
+    keyboard = [[InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     query.edit_message_text(
@@ -76,28 +66,14 @@ def handle_rappel_callback(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
 
-# === Gestion des périodes et dates ===
-def handle_text_message(update: Update, context: CallbackContext):
-    if not update.message or not update.message.text:
-        return
-
-    message_text = update.message.text.strip()
-
-    if "quittance_tenant" in context.user_data:
-        handle_quittance_period(update, context)
-    elif "rappel_tenant" in context.user_data:
-        handle_rappel_date(update, context)
-    else:
-        update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
-
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:(.*)$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:(.*)$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
 
-# === ConversationHandler pour ajouter locataire et bailleur ===
+# === ConversationHandler pour ajouter locataire ===
 dispatcher.add_handler(ConversationHandler(
     entry_points=[CommandHandler("ajouter_locataire", handle_add_tenant)],
     states={
@@ -121,7 +97,7 @@ dispatcher.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
 # === Route webhook Telegram avec Debug ===
 @app.post("/webhook")
@@ -142,4 +118,4 @@ async def root():
 async def set_webhook():
     webhook_url = f"{WEBHOOK_URL}/webhook"
     bot.delete_webhook()
-    response = bot.set_webhook(url=webhook_url)
+    bot.set_webhook(url=webhook_url)
