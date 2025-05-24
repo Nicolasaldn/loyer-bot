@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
+from utils.sheets import list_tenants  # ✅ Liste dynamique
 import os
 import zipfile
 from datetime import datetime
@@ -15,7 +16,7 @@ FRENCH_MONTHS = {
 }
 
 def handle_quittance_command(update: Update, context: CallbackContext):
-    tenants = ["Thomas Cohen", "Claire Dubois", "Jean Dujardin"]
+    tenants = list_tenants()  # ✅ Liste dynamique
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
