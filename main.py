@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Request
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext, ConversationHandler
+from telegram.ext import (
+    Dispatcher, CommandHandler, MessageHandler, Filters,
+    CallbackQueryHandler, CallbackContext, ConversationHandler
+)
 import os
 import json
 from datetime import datetime
@@ -11,12 +14,14 @@ from handlers.message_handler import handle_message
 from handlers.rappel_handler import (
     handle_rappel_command,
     handle_rappel_selection,
-    handle_rappel_date
+    handle_rappel_date,
+    SELECT_TENANT, ENTER_DATE
 )
 from handlers.quittance_handler import (
     handle_quittance_command,
     handle_quittance_selection,
-    handle_quittance_period
+    handle_quittance_period,
+    SELECT_TENANT_QUITTANCE, ENTER_PERIOD
 )
 from handlers.locataire_bailleur_handler import (
     handle_add_tenant,
@@ -40,43 +45,32 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
-# === Gestion des callbacks ===
-def handle_quittance_callback(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-
-    tenants = list_tenants()
-    keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    query.edit_message_text(
-        text="Quel locataire pour la quittance ?",
-        reply_markup=reply_markup
-    )
-
-def handle_rappel_callback(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-
-    tenants = list_tenants()
-    keyboard = [[InlineKeyboardButton(name, callback_data=f"rappel:{name}")] for name in tenants]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    query.edit_message_text(
-        text="Quel locataire pour le rappel ?",
-        reply_markup=reply_markup
-    )
-
 # === Gestion des messages textuels ===
 def handle_text_message(update: Update, context: CallbackContext):
     update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
 
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_callback, pattern="^/rappel$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_callback, pattern="^/quittance$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
+
+# === ConversationHandler pour /rappel ===
+dispatcher.add_handler(ConversationHandler(
+    entry_points=[CommandHandler("rappel", handle_rappel_command)],
+    states={
+        SELECT_TENANT: [CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:")],
+        ENTER_DATE: [MessageHandler(Filters.text & ~Filters.command, handle_rappel_date)],
+    },
+    fallbacks=[]
+))
+
+# === ConversationHandler pour /quittance ===
+dispatcher.add_handler(ConversationHandler(
+    entry_points=[CommandHandler("quittance", handle_quittance_command)],
+    states={
+        SELECT_TENANT_QUITTANCE: [CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:")],
+        ENTER_PERIOD: [MessageHandler(Filters.text & ~Filters.command, handle_quittance_period)],
+    },
+    fallbacks=[]
+))
 
 # === ConversationHandler pour ajouter locataire ===
 dispatcher.add_handler(ConversationHandler(
@@ -102,8 +96,14 @@ dispatcher.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
+# === Callback boutons inline ajout locataire/bailleur ===
+dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
+
+# === Handler par défaut pour les messages non-commandes ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
+# === Webhook ===
 @app.post("/webhook")
 async def webhook(req: Request):
     try:
