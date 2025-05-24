@@ -1,5 +1,3 @@
-# quittance_handler.py
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
@@ -21,12 +19,19 @@ def handle_quittance_command(update: Update, context: CallbackContext):
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    query = update.callback_query
-    query.answer()
-    query.edit_message_text(
-        text="Quel locataire pour la quittance ?",
-        reply_markup=reply_markup
-    )
+    if update.callback_query:
+        query = update.callback_query
+        query.answer()
+        query.edit_message_text(
+            text="Quel locataire pour la quittance ?",
+            reply_markup=reply_markup
+        )
+    else:
+        update.message.reply_text(
+            text="Quel locataire pour la quittance ?",
+            reply_markup=reply_markup
+        )
+
     print("✅ [DEBUG] Commande quittance déclenchée.")
     return SELECT_TENANT_QUITTANCE
 
