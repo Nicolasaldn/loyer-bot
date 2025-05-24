@@ -52,9 +52,12 @@ def handle_text_message(update: Update, context: CallbackContext):
 # === Ajout des handlers ===
 dispatcher.add_handler(CommandHandler("start", start))
 
-# === ConversationHandler pour /rappel ===
+# === ConversationHandler pour rappel ===
 dispatcher.add_handler(ConversationHandler(
-    entry_points=[CommandHandler("rappel", handle_rappel_command)],
+    entry_points=[
+        CommandHandler("rappel", handle_rappel_command),
+        CallbackQueryHandler(handle_rappel_command, pattern="^rappel:start$")
+    ],
     states={
         SELECT_TENANT: [CallbackQueryHandler(handle_rappel_selection, pattern="^rappel:")],
         ENTER_DATE: [MessageHandler(Filters.text & ~Filters.command, handle_rappel_date)],
@@ -62,9 +65,12 @@ dispatcher.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
-# === ConversationHandler pour /quittance ===
+# === ConversationHandler pour quittance ===
 dispatcher.add_handler(ConversationHandler(
-    entry_points=[CommandHandler("quittance", handle_quittance_command)],
+    entry_points=[
+        CommandHandler("quittance", handle_quittance_command),
+        CallbackQueryHandler(handle_quittance_command, pattern="^quittance:start$")
+    ],
     states={
         SELECT_TENANT_QUITTANCE: [CallbackQueryHandler(handle_quittance_selection, pattern="^quittance:")],
         ENTER_PERIOD: [MessageHandler(Filters.text & ~Filters.command, handle_quittance_period)],
@@ -99,10 +105,6 @@ dispatcher.add_handler(ConversationHandler(
 # === Callback boutons inline ajout locataire/bailleur ===
 dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
-
-# ✅ Nouveaux handlers pour déclencher rappel et quittance via boutons du menu /start
-dispatcher.add_handler(CallbackQueryHandler(handle_rappel_command, pattern="^rappel:start$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_quittance_command, pattern="^quittance:start$"))
 
 # === Handler par défaut pour les messages non-commandes ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
