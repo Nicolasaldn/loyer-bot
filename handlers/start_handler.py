@@ -20,16 +20,16 @@ def start(update: Update, context: CallbackContext):
     else:
         message += "❌ Les locataires ne sont pas disponibles actuellement."
 
-    # Création des boutons inline (cliquables)
+    # Boutons inline adaptés au système de ConversationHandler
     keyboard = [
-        [InlineKeyboardButton("📄 Envoyer un Rappel", callback_data="/rappel")],
-        [InlineKeyboardButton("📃 Générer une Quittance", callback_data="/quittance")],
+        [InlineKeyboardButton("📄 Envoyer un Rappel", callback_data="rappel:start")],
+        [InlineKeyboardButton("📃 Générer une Quittance", callback_data="quittance:start")],
         [InlineKeyboardButton("👥 Ajouter un Locataire", callback_data="/ajouter_locataire")],
         [InlineKeyboardButton("🏡 Ajouter un Bailleur", callback_data="/ajouter_bailleur")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Envoi du message avec les boutons inline
+    # Envoi du message avec les boutons
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=message + "\nChoisis une option ci-dessous :",
