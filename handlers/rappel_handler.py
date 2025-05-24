@@ -22,10 +22,12 @@ def handle_rappel_command(update: Update, context: CallbackContext):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    update.message.reply_text(
+    query = update.callback_query
+query.answer()
+query.edit_message_text(
     text="Quel locataire pour le rappel ?",
     reply_markup=reply_markup
-    )
+)
     print("✅ [DEBUG] Commande rappel déclenchée.")
     return SELECT_TENANT
 
