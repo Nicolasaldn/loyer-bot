@@ -21,10 +21,12 @@ def handle_quittance_command(update: Update, context: CallbackContext):
     keyboard = [[InlineKeyboardButton(name, callback_data=f"quittance:{name}")] for name in tenants]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    update.message.reply_text(
-        text="Quel locataire pour la quittance ?",
-        reply_markup=reply_markup
-    )
+    query = update.callback_query
+query.answer()
+query.edit_message_text(
+    text="Quel locataire pour la quittance ?",
+    reply_markup=reply_markup
+)
     print("✅ [DEBUG] Commande quittance déclenchée.")
     return SELECT_TENANT_QUITTANCE
 
