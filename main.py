@@ -100,6 +100,10 @@ dispatcher.add_handler(ConversationHandler(
 dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
 
+# ✅ Nouveaux handlers pour déclencher rappel et quittance via boutons du menu /start
+dispatcher.add_handler(CallbackQueryHandler(handle_rappel_command, pattern="^rappel:start$"))
+dispatcher.add_handler(CallbackQueryHandler(handle_quittance_command, pattern="^quittance:start$"))
+
 # === Handler par défaut pour les messages non-commandes ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
