@@ -1,5 +1,3 @@
-# rappel_handler.py
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 import os
@@ -11,7 +9,7 @@ except ImportError:
     print("❌ [DEBUG] Erreur : La fonction generate_rappel_pdf n'a pas été trouvée.")
     generate_rappel_pdf = None
 
-# ✅ Définition des états pour le ConversationHandler
+# ✅ États pour le ConversationHandler
 SELECT_TENANT, ENTER_DATE = range(2)
 
 def handle_rappel_command(update: Update, context: CallbackContext):
@@ -22,12 +20,19 @@ def handle_rappel_command(update: Update, context: CallbackContext):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    query = update.callback_query
-    query.answer()
-    query.edit_message_text(
-        text="Quel locataire pour le rappel ?",
-        reply_markup=reply_markup
-    )
+    if update.callback_query:
+        query = update.callback_query
+        query.answer()
+        query.edit_message_text(
+            text="Quel locataire pour le rappel ?",
+            reply_markup=reply_markup
+        )
+    else:
+        update.message.reply_text(
+            text="Quel locataire pour le rappel ?",
+            reply_markup=reply_markup
+        )
+
     print("✅ [DEBUG] Commande rappel déclenchée.")
     return SELECT_TENANT
 
@@ -74,7 +79,7 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         # ✅ Assure que le dossier pdf/generated/ existe
         output_dir = "pdf/generated/"
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # ✅ Génération du PDF avec chemin sécurisé
         pdf_filename = f"Avis_{tenant_name.replace(' ', '_')}_{date.replace('/', '-')}.pdf"
         pdf_path = os.path.join(output_dir, pdf_filename)
@@ -94,7 +99,7 @@ def handle_rappel_date(update: Update, context: CallbackContext):
         with open(generated_pdf_path, "rb") as pdf_file:
             update.message.reply_document(document=pdf_file)
             print(f"✅ [DEBUG] PDF envoyé : {generated_pdf_path}")
-        
+
         # ✅ Suppression du PDF après envoi
         os.remove(generated_pdf_path)
         print(f"✅ [DEBUG] PDF supprimé : {generated_pdf_path}")
