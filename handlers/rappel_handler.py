@@ -2,6 +2,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 import os
 
+# ✅ Import de la liste dynamique de locataires
+from utils.sheets import list_tenants
+
 # ✅ Import sécurisé de la fonction generate_rappel_pdf
 try:
     from pdf.generate_rappel import generate_rappel_pdf
@@ -13,7 +16,7 @@ except ImportError:
 SELECT_TENANT, ENTER_DATE = range(2)
 
 def handle_rappel_command(update: Update, context: CallbackContext):
-    tenants = ["Thomas Cohen", "Claire Dubois", "Jean Dujardin"]  # Dynamique possible via Google Sheet
+    tenants = list_tenants()
     keyboard = [
         [InlineKeyboardButton(name, callback_data=f"rappel:{name}")]
         for name in tenants
