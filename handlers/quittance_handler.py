@@ -1,3 +1,5 @@
+# quittance_handler.py
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
@@ -7,7 +9,7 @@ from datetime import datetime
 import re
 
 # ✅ États pour le ConversationHandler
-SELECT_TENANT, ENTER_PERIOD = range(2)
+SELECT_TENANT_QUITTANCE, ENTER_PERIOD = range(2)
 
 FRENCH_MONTHS = {
     "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
@@ -24,7 +26,7 @@ def handle_quittance_command(update: Update, context: CallbackContext):
         reply_markup=reply_markup
     )
     print("✅ [DEBUG] Commande quittance déclenchée.")
-    return SELECT_TENANT
+    return SELECT_TENANT_QUITTANCE
 
 def handle_quittance_selection(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -47,7 +49,7 @@ def handle_quittance_period(update: Update, context: CallbackContext):
 
     if not tenant_name:
         update.message.reply_text("❌ Erreur : aucun locataire sélectionné.")
-        return SELECT_TENANT
+        return SELECT_TENANT_QUITTANCE
 
     try:
         if "à" in period:
@@ -68,7 +70,11 @@ def handle_quittance_period(update: Update, context: CallbackContext):
                 update.message.reply_document(document=pdf_file)
             os.remove(pdf_path)
         else:
-            filepaths = generate_quittances_pdf(tenant_name, start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"))
+            filepaths = generate_quittances_pdf(
+                tenant_name,
+                start_date.strftime("%d/%m/%Y"),
+                end_date.strftime("%d/%m/%Y")
+            )
 
             zip_path = os.path.join("pdf/generated/", f"Quittances_{tenant_name.replace(' ', '_')}.zip")
             with zipfile.ZipFile(zip_path, "w") as zipf:
@@ -85,3 +91,4 @@ def handle_quittance_period(update: Update, context: CallbackContext):
     except Exception as e:
         print(f"❌ [DEBUG] Erreur lors de la génération : {str(e)}")
         update.message.reply_text(f"❌ Erreur : {str(e)}")
+        return ConversationHandler.END
