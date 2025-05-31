@@ -1,11 +1,10 @@
 from fastapi import FastAPI, Request
-from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Bot, Update
 from telegram.ext import (
     Dispatcher, CommandHandler, MessageHandler, Filters,
     CallbackQueryHandler, CallbackContext, ConversationHandler
 )
 import os
-import json
 from datetime import datetime
 
 # === Imports organisés ===
@@ -32,27 +31,22 @@ from handlers.locataire_bailleur_handler import (
     ADD_TENANT_FREQUENCY, ADD_TENANT_LANDLORD, ADD_LANDLORD_NAME, ADD_LANDLORD_ADDRESS
 )
 
-from utils.sheets import list_tenants
-from pdf.generate_quittance import generate_quittance_pdf, generate_quittances_pdf
-from pdf.generate_rappel import generate_rappel_pdf
-
-# === Initialisation FastAPI ===
+# === Initialisation FastAPI et Bot ===
 app = FastAPI()
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=1, use_context=True)
 
-# === Gestion des messages textuels ===
+# === Handler par défaut pour texte sans contexte ===
 def handle_text_message(update: Update, context: CallbackContext):
     update.message.reply_text("❌ Erreur : aucune action en cours. Utilise /start.")
 
-# === Ajout des handlers ===
+# === Commande /start ===
 dispatcher.add_handler(CommandHandler("start", start))
 
-# === ConversationHandler pour rappel ===
+# === Conversation: Rappel ===
 dispatcher.add_handler(ConversationHandler(
     entry_points=[
         CommandHandler("rappel", handle_rappel_command),
@@ -65,7 +59,7 @@ dispatcher.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
-# === ConversationHandler pour quittance ===
+# === Conversation: Quittance ===
 dispatcher.add_handler(ConversationHandler(
     entry_points=[
         CommandHandler("quittance", handle_quittance_command),
@@ -78,38 +72,40 @@ dispatcher.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
-# === ConversationHandler pour ajouter locataire ===
+# === Conversation: Ajouter locataire (commande et bouton inline) ===
 dispatcher.add_handler(ConversationHandler(
-    entry_points=[CommandHandler("ajouter_locataire", handle_add_tenant)],
+    entry_points=[
+        CommandHandler("ajouter_locataire", handle_add_tenant),
+        CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$")
+    ],
     states={
         ADD_TENANT_NAME: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_name)],
         ADD_TENANT_EMAIL: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_email)],
         ADD_TENANT_ADDRESS: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_address)],
         ADD_TENANT_RENT: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_rent)],
         ADD_TENANT_FREQUENCY: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_frequency)],
-        ADD_TENANT_LANDLORD: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_landlord)]
+        ADD_TENANT_LANDLORD: [MessageHandler(Filters.text & ~Filters.command, handle_add_tenant_landlord)],
     },
     fallbacks=[]
 ))
 
-# === ConversationHandler pour ajouter bailleur ===
+# === Conversation: Ajouter bailleur (commande et bouton inline) ===
 dispatcher.add_handler(ConversationHandler(
-    entry_points=[CommandHandler("ajouter_bailleur", handle_add_landlord)],
+    entry_points=[
+        CommandHandler("ajouter_bailleur", handle_add_landlord),
+        CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$")
+    ],
     states={
         ADD_LANDLORD_NAME: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_name)],
-        ADD_LANDLORD_ADDRESS: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_address)]
+        ADD_LANDLORD_ADDRESS: [MessageHandler(Filters.text & ~Filters.command, handle_add_landlord_address)],
     },
     fallbacks=[]
 ))
 
-# === Callback boutons inline ajout locataire/bailleur ===
-dispatcher.add_handler(CallbackQueryHandler(handle_add_tenant, pattern="^/ajouter_locataire$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_add_landlord, pattern="^/ajouter_bailleur$"))
-
-# === Handler par défaut pour les messages non-commandes ===
+# === Fallback pour tout texte hors conversation ===
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
 
-# === Webhook ===
+# === Webhook Telegram (POST) ===
 @app.post("/webhook")
 async def webhook(req: Request):
     try:
@@ -120,10 +116,12 @@ async def webhook(req: Request):
         print("❌ [DEBUG] Erreur webhook :", e)
     return {"ok": True}
 
+# === Ping HTTP (GET) ===
 @app.get("/")
 async def root():
     return {"message": "Bot opérationnel ✅"}
 
+# === Au démarrage de FastAPI ===
 @app.on_event("startup")
 async def set_webhook():
     webhook_url = f"{WEBHOOK_URL}/webhook"
